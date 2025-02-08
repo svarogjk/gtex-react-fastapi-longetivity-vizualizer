@@ -1,0 +1,34 @@
+frontend/
+├── src/
+│   ├── types/
+│   │   └── index.ts           # Types and interfaces
+│   ├── services/
+│   │   └── api.ts            # API service
+│   ├── features/
+│   │   ├── expression/
+│   │   │   ├── ExpressionAnalysis.tsx
+│   │   │   └── expressionSlice.ts
+│   │   ├── survival/
+│   │   │   ├── SurvivalAnalysis.tsx
+│   │   │   └── survivalSlice.ts
+│   │   └── dashboard/
+│   │       └── Dashboard.tsx
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── Header.tsx
+│   │   │   └── Sidebar.tsx
+│   │   ├── analysis/
+│   │   │   ├── ExpressionChart.tsx
+│   │   │   ├── SurvivalChart.tsx
+│   │   │   ├── GeneSelector.tsx
+│   │   │   └── TissueSelector.tsx
+│   │   └── common/
+│   │       ├── Loading.tsx
+│   │       └── ErrorMessage.tsx
+│   ├── app/
+│   │   ├── store.ts
+│   │   └── hooks.ts
+│   ├── App.tsx
+│   └── index.tsx
+├── tailwind.config.js
+└── tsconfig.json
