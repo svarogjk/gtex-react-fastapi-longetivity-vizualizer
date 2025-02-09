@@ -5,7 +5,7 @@ from typing import List
 router = APIRouter()
 
 
-@router.get("/genes/{tissue}")
+@router.post("/genes/{tissue}")
 async def get_expression(
     tissue: str, genes: List[str], gtex_service: GTExService = Depends()
 ):

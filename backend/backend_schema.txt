@@ -1,0 +1,19 @@
+backend/
+├── app/
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── routes/
+│   │       ├── __init__.py
+│   │       ├── expression.py
+│   │       └── survival.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── gtex_service.py
+│   │   └── analysis_service.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── helpers.py
+│   └── __init__.py
+├── main.py
+├── requirements.txt
+└── README.md

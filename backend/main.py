@@ -1,9 +1,17 @@
+# main.py
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import expression
+from app.api.routes import expression, survival
 
-app = FastAPI()
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
+app = FastAPI(title="GTEx Analysis API")
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -12,7 +20,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Routes
 app.include_router(expression.router, prefix="/api/expression", tags=["expression"])
+app.include_router(survival.router, prefix="/api/survival", tags=["survival"])
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 
 if __name__ == "__main__":
     import uvicorn

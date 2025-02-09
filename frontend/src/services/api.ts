@@ -5,8 +5,9 @@ const API_BASE_URL = 'http://localhost:8000/api';
 
 export const api = {
     getExpressionData: async (genes: string[], tissue: string) => {
-        const response = await axios.get(`${API_BASE_URL}/expression/genes/${tissue}`, {
-            params: { genes }
+        const response = await axios.post('http://localhost:8000/api/expression/genes', {
+            genes,
+            tissue
         });
         return response.data;
     },

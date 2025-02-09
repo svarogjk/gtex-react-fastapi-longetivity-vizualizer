@@ -1,48 +1,51 @@
+# app/services/analysis_service.py
 import pandas as pd
 import numpy as np
 from lifelines import KaplanMeierFitter
 from sklearn.preprocessing import StandardScaler
+from typing import Dict, Any
 
 
 class AnalysisService:
-    def analyze_survival(self, df: pd.DataFrame, gene: str) -> dict:
-        """Perform survival analysis for a specific gene"""
+    def analyze_survival(self, df: pd.DataFrame, gene: str) -> Dict[str, Any]:
+        """Perform survival analysis"""
         kmf = KaplanMeierFitter()
 
         # Split by median expression
         median_expr = df[gene].median()
         high_expr = df[gene] > median_expr
 
-        # Fit survival curves
+        results = {}
+
+        # High expression group
         kmf.fit(
             df.loc[high_expr, "time"],
             df.loc[high_expr, "event"],
             label="High Expression",
         )
-        high_surv = kmf.survival_function_
+        results["high_expression"] = {
+            "survival": kmf.survival_function_.to_dict(),
+            "median": kmf.median_survival_time_,
+        }
 
+        # Low expression group
         kmf.fit(
             df.loc[~high_expr, "time"],
             df.loc[~high_expr, "event"],
             label="Low Expression",
         )
-        low_surv = kmf.survival_function_
-
-        return {
-            "high_expression": high_surv.reset_index().to_dict("records"),
-            "low_expression": low_surv.reset_index().to_dict("records"),
+        results["low_expression"] = {
+            "survival": kmf.survival_function_.to_dict(),
+            "median": kmf.median_survival_time_,
         }
 
-    def analyze_expression_patterns(self, df: pd.DataFrame) -> dict:
-        """Analyze expression patterns across samples"""
+        return results
+
+    def analyze_expression_patterns(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Analyze expression patterns"""
         return {
-            "distribution": {
-                "quantiles": df["expression"].quantile([0.25, 0.5, 0.75]).to_dict(),
-                "mean": df["expression"].mean(),
-                "std": df["expression"].std(),
-            },
-            "genes": {
-                gene: df[df["gene"] == gene]["expression"].describe().to_dict()
-                for gene in df["gene"].unique()
-            },
+            "distribution": df["expression"].describe().to_dict(),
+            "correlations": df.pivot(columns="gene", values="expression")
+            .corr()
+            .to_dict(),
         }
