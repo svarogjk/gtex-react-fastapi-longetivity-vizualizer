@@ -1,3 +1,4 @@
+dask==2025.1.0
 pandas==2.2.3
 fastapi==0.115.8
 lifelines==0.30.0
