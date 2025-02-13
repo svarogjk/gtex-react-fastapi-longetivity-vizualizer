@@ -1,13 +1,14 @@
 backend/
-├── app/
-│   ├── api/
+├── api/
+│   ├── endpoints/
 │   │   ├── __init__.py
-│   │   └── routes/
-│   │       ├── __init__.py
-│   │       ├── expression.py
-│   │       └── survival.py
+│   │   └── expression.py  # Contains ExpressionEndpoints class and instance
+│   └── routes/
+│       ├── __init__.py
+│       └── expression.py  
 │   ├── services/
 │   │   ├── __init__.py
+│    │    └── search_service.py
 │   │   ├── gtex_service.py
 │   │   └── analysis_service.py
 │   ├── utils/

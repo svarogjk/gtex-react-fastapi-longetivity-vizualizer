@@ -21,6 +21,9 @@ app.add_middleware(
 )
 
 # Routes
+app.include_router(
+    expression.router, prefix="/api/dropdown_routes", tags=["left_panel_dropdowns"]
+)
 app.include_router(expression.router, prefix="/api/expression", tags=["expression"])
 app.include_router(survival.router, prefix="/api/survival", tags=["survival"])
 
