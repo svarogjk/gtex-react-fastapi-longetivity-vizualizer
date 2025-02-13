@@ -13,6 +13,8 @@ backend/
 │   ├── utils/
 │   │   ├── __init__.py
 │   │   └── helpers.py
+    └──server_cache/
+        └──cache_manager.py
 │   └── __init__.py
 ├── main.py
 ├── requirements.txt

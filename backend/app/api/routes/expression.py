@@ -78,64 +78,6 @@ async def lifespan(app):
 router = APIRouter()
 
 
-class DatasetEnum(str, Enum):
-    LONGEVITY_DB = "longevity_db"
-    AGING_ATLAS = "aging_atlas"
-    CALORIC_RESTRICTION = "caloric_restriction"
-    LONGITUDINAL_AGING = "longitudinal_aging"
-    CENTENARIAN_STUDY = "centenarian_study"
-
-
-# Dataset metadata with file paths and configurations
-DATASET_CONFIG = {
-    "longevity_db": {
-        "name": "LongevityDB",
-        "description": "Comprehensive database of longevity-associated genes and variants",
-        "file_path": "data/longevity_db.parquet",
-        "samples": 15000,
-        "variables": ["age", "lifespan", "health_status", "genetic_variants"],
-        "index_col": "sample_id",
-        "cache_key_prefix": "longevity_db",
-    },
-    "aging_atlas": {
-        "name": "Aging Atlas",
-        "description": "Multi-tissue molecular signatures of aging",
-        "file_path": "data/aging_atlas.parquet",
-        "samples": 20000,
-        "variables": ["age", "tissue_type", "expression_level", "aging_score"],
-        "index_col": "sample_id",
-        "cache_key_prefix": "aging_atlas",
-    },
-    "caloric_restriction": {
-        "name": "Caloric Restriction Study",
-        "description": "Long-term effects of caloric restriction on longevity",
-        "file_path": "data/caloric_restriction.parquet",
-        "samples": 8000,
-        "variables": ["intervention_group", "lifespan", "metabolic_markers"],
-        "index_col": "sample_id",
-        "cache_key_prefix": "caloric",
-    },
-    "longitudinal_aging": {
-        "name": "Longitudinal Aging Study",
-        "description": "20-year longitudinal study of aging biomarkers",
-        "file_path": "data/longitudinal_aging.parquet",
-        "samples": 12000,
-        "variables": ["timepoint", "age", "biomarkers", "health_outcomes"],
-        "index_col": "sample_id",
-        "cache_key_prefix": "longitudinal",
-    },
-    "centenarian_study": {
-        "name": "Centenarian Cohort",
-        "description": "Genetic and phenotypic data from centenarians",
-        "file_path": "data/centenarian.parquet",
-        "samples": 5000,
-        "variables": ["age", "genetic_profile", "lifestyle_factors"],
-        "index_col": "sample_id",
-        "cache_key_prefix": "centenarian",
-    },
-}
-
-
 class CacheManager:
     @staticmethod
     def get_cache_key(prefix: str, *args) -> str:
@@ -187,80 +129,19 @@ class CacheManager:
 
 async def load_dataset(dataset_id: DatasetEnum) -> dd.DataFrame:
     """Load dataset using Dask for efficient processing"""
-    config = DATASET_CONFIG[dataset_id]
-    file_path = config["file_path"]
 
-    if not os.path.exists(file_path):
-        raise HTTPException(
-            status_code=404, detail=f"Dataset file not found: {dataset_id}"
-        )
-
-    try:
-        return dd.read_parquet(file_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error loading dataset: {str(e)}")
+    pass
 
 
 @router.get("/datasets")
 async def get_available_datasets():
-    """Get list of available datasets with metadata"""
-    cache_key = "datasets:list"
-
-    # Try to get from cache
-    cached_data = await CacheManager.get_cached_data(cache_key)
-    if cached_data:
-        return cached_data
-
-    # Prepare fresh data
-    datasets = [
-        {
-            "id": dataset_id,
-            "name": metadata["name"],
-            "description": metadata["description"],
-            "sample_count": metadata["samples"],
-            "available_variables": metadata["variables"],
-        }
-        for dataset_id, metadata in DATASET_CONFIG.items()
-    ]
-
-    # Cache the result
-    await CacheManager.set_cached_data(cache_key, datasets)
-    return datasets
+    pass
 
 
 @router.get("/datasets/{dataset_id}/metadata")
 async def get_dataset_metadata(dataset_id: DatasetEnum):
     """Get dataset metadata with caching"""
-    cache_key = CacheManager.get_cache_key("metadata", dataset_id)
-
-    # Try to get from cache
-    cached_data = await CacheManager.get_cached_data(cache_key)
-    if cached_data:
-        return cached_data
-
-    # Load fresh data
-    try:
-        ddf = await load_dataset(dataset_id)
-        metadata_sample = ddf.head()
-
-        result = {
-            "columns": [
-                {
-                    "name": col,
-                    "type": str(metadata_sample[col].dtype),
-                    "description": DATASET_CONFIG[dataset_id]["variables"].get(col, ""),
-                }
-                for col in metadata_sample.columns
-            ],
-            "rows": metadata_sample.to_dict(orient="records"),
-        }
-
-        # Cache the result
-        await CacheManager.set_cached_data(cache_key, result)
-        return result
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    pass
 
 
 @router.post("/expression/analysis")
