@@ -18,6 +18,7 @@ frontend/
 │   │   │   ├── Header.tsx
 │   │   │   └── Sidebar.tsx
 │   │   ├── analysis/
+│   │   │   ├── AnalysisDropdowns.tsx
 │   │   │   ├── ExpressionChart.tsx
 │   │   │   ├── SurvivalChart.tsx
 │   │   │   ├── GeneSelector.tsx
