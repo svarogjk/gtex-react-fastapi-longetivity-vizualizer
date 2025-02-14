@@ -2,7 +2,7 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import expression, survival
+from app.api.routes import expression, survival, dropdown_routes
 
 # Configure logging
 logging.basicConfig(
@@ -22,7 +22,7 @@ app.add_middleware(
 
 # Routes
 app.include_router(
-    expression.router, prefix="/api/dropdown_routes", tags=["left_panel_dropdowns"]
+    dropdown_routes.router, prefix="/api/dropdown_routes", tags=["left_panel_dropdowns"]
 )
 app.include_router(expression.router, prefix="/api/expression", tags=["expression"])
 app.include_router(survival.router, prefix="/api/survival", tags=["survival"])

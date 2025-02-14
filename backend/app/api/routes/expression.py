@@ -71,36 +71,3 @@ async def get_tissue_summary(gene: str):
     except Exception as e:
         logger.error(f"Error getting tissue summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# Dropdown endpoints
-@router.get("/dropdown/genes")
-async def get_gene_options(query: Optional[str] = None):
-    """Get gene options for dropdown"""
-    try:
-        results = await search_service.search_genes(query)
-        return results
-    except Exception as e:
-        logger.error(f"Error getting gene options: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/dropdown/datasets")
-async def get_dataset_options(genes: Optional[List[str]] = Query(None)):
-    """Get dataset options for dropdown"""
-    try:
-        results = await search_service.search_datasets(genes)
-        return results
-    except Exception as e:
-        logger.error(f"Error getting dataset options: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/dropdown/options")
-async def get_dropdown_options():
-    """Get all options for both dropdowns"""
-    try:
-        return await search_service.get_dropdown_options()
-    except Exception as e:
-        logger.error(f"Error getting dropdown options: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
