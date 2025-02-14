@@ -49,47 +49,84 @@ class SearchService:
     @cache.memoize(timeout=3600)
     async def search_genes(self, query: Optional[str] = None) -> Dict:
         """
-        Search for genes based on query or longevity keywords
+        Search for genes based on query and longevity keywords using NCBI E-utilities
         Returns both direct matches and longevity-related genes
         """
         try:
+            # Construct search query
             search_terms = []
             if query:
-                search_terms.append(query)
-            search_terms.extend(self.longevity_keywords)
+                search_terms.append(f'"{query}"[All Fields]')
+
+            # Add longevity-related terms with proper field tags
+            longevity_query = " OR ".join(
+                [f'"{term}"[All Fields]' for term in self.longevity_keywords]
+            )
+            search_terms.append(f"({longevity_query})")
+
+            # Add organism specification for human genes
+            search_terms.append('"Homo sapiens"[Organism]')
+
+            # Combine all terms
+            final_query = " AND ".join(search_terms)
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                # Search GTEx for each term
-                tasks = []
-                for term in search_terms:
-                    tasks.append(
-                        client.get(
-                            f"{self.gtex_base_url}/reference/gene",
-                            params={"geneId": term, "format": "json", "limit": 50},
-                        )
+                # First, search for gene IDs
+                esearch_response = await client.get(
+                    f"{self.geo_base_url}/esearch.fcgi",
+                    params={
+                        "db": "gene",
+                        "term": final_query,
+                        "retmax": 100,
+                        "retmode": "json",
+                    },
+                )
+
+                if esearch_response.status_code != 200:
+                    logger.error(f"NCBI esearch failed: {esearch_response.status_code}")
+                    return {"genes": [], "gene_details": {}, "total_count": 0}
+
+                search_data = esearch_response.json()
+                gene_ids = search_data.get("esearchresult", {}).get("idlist", [])
+
+                if not gene_ids:
+                    return {"genes": [], "gene_details": {}, "total_count": 0}
+
+                # Get detailed information for found genes
+                esummary_response = await client.get(
+                    f"{self.geo_base_url}/esummary.fcgi",
+                    params={"db": "gene", "id": ",".join(gene_ids), "retmode": "json"},
+                )
+
+                if esummary_response.status_code != 200:
+                    logger.error(
+                        f"NCBI esummary failed: {esummary_response.status_code}"
                     )
+                    return {"genes": [], "gene_details": {}, "total_count": 0}
 
-                responses = await asyncio.gather(*tasks, return_exceptions=True)
+                summary_data = esummary_response.json()
+                result = summary_data.get("result", {})
 
-                # Process results
                 genes = set()
                 gene_details = {}
 
-                for response in responses:
-                    if isinstance(response, Exception):
-                        continue
-
-                    if response.status_code == 200:
-                        data = response.json().get("data", [])
-                        for gene in data:
-                            symbol = gene.get("geneSymbol")
-                            if symbol:
-                                genes.add(symbol)
-                                gene_details[symbol] = {
-                                    "description": gene.get("geneDescription", ""),
-                                    "type": gene.get("geneType", ""),
-                                    "gencode_id": gene.get("gencodeId", ""),
-                                }
+                # Process each gene
+                for gene_id in gene_ids:
+                    gene_data = result.get(str(gene_id), {})
+                    if gene_data:
+                        symbol = gene_data.get("name")  # Gene symbol
+                        if symbol:
+                            genes.add(symbol)
+                            gene_details[symbol] = {
+                                "description": gene_data.get("description", ""),
+                                "type": gene_data.get("type", ""),
+                                "summary": gene_data.get("summary", ""),
+                                "aliases": gene_data.get("otheraliases", "").split(
+                                    ", "
+                                ),
+                                "chromosome": gene_data.get("chromosome", ""),
+                                "location": gene_data.get("maplocation", ""),
+                            }
 
                 return {
                     "genes": sorted(list(genes)),
