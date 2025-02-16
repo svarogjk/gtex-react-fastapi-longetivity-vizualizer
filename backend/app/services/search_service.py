@@ -257,3 +257,50 @@ class SearchService:
                 "genes": {"options": [], "total_count": 0},
                 "datasets": {"options": [], "total_count": 0},
             }
+
+    @cache.memoize(timeout=3600)
+    async def get_dataset_details(self, dataset_id: str) -> Dict:
+        """Get detailed information about a specific dataset"""
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # Get details using E-utils
+                response = await client.get(
+                    f"{self.geo_base_url}/esummary.fcgi",
+                    params={"db": "gds", "id": dataset_id, "retmode": "json"},
+                )
+
+                if response.status_code != 200:
+                    return {
+                        "success": False,
+                        "message": "Failed to fetch dataset details",
+                    }
+
+                data = response.json()
+                result = data.get("result", {}).get(str(dataset_id), {})
+
+                if not result:
+                    return {"success": False, "message": "Dataset not found"}
+
+                # Extract metadata fields from the dataset
+                samples = result.get("samples", [])
+                metadata = {}
+
+                # Process sample characteristics to extract metadata fields
+                for sample in samples:
+                    for char in sample.get("characteristics", []):
+                        key, value = char.split(": ", 1) if ": " in char else (char, "")
+                        if key not in metadata:
+                            metadata[key] = []
+                        metadata[key].append(value)
+
+                return {
+                    "success": True,
+                    "metadata": metadata,
+                    "title": result.get("title", ""),
+                    "summary": result.get("summary", ""),
+                    "samples": len(samples),
+                }
+
+        except Exception as e:
+            logger.error(f"Error getting dataset details: {str(e)}")
+            return {"success": False, "message": str(e)}

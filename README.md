@@ -28,3 +28,13 @@ Interactive charts for gene expression
 Survival curves
 Feature importance plots
 Tissue-specific expression patterns
+
+All pages should have the same structure: left panel with dropdown inputs and main panel with results 
+
+1. Survival analysis
+On the left panel there should be four steps for selection:
+1. Gene selection
+2. Tissue selection - Depends on the Gene selection and includes only tissues that contain the gene 
+3. Dataset selection - Depends on the Gene and Tissue
+4. Target variable selection where the target variable is a column from dataset metadata that contains from 2 to 10
+unique values.
