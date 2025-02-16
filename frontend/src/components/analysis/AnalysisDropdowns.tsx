@@ -2,15 +2,15 @@
 import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { fetchDropdownOptions, setSelectedGene, setSelectedDataset } from '../../features/analysis/analysisSlice';
-import { Card, CardContent } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '../../components/ui/card';
+import { Label } from '../../components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '../../components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface DropdownOption {

@@ -37,7 +37,7 @@ const initialState: AnalysisState = {
 export const fetchDropdownOptions = createAsyncThunk(
   'analysis/fetchDropdownOptions',
   async () => {
-    const response = await axios.get('http://localhost:8000/api/dropdown/options');
+    const response = await axios.get('http://localhost:8000/api/dropdown_routes/dropdown/options');
     return response.data;
   }
 );

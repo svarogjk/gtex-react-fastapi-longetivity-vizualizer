@@ -1,19 +1,24 @@
 import axios from 'axios';
-import { GeneExpressionData, SurvivalData } from '../types';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://localhost:8000/api/dropdown_routes';
 
 export const api = {
-    getExpressionData: async (genes: string[], tissue: string) => {
-        const response = await axios.post('http://localhost:8000/api/expression/genes', {
-            genes,
-            tissue
+    getDropdownOptions: async () => {
+        const response = await axios.get(`${API_BASE_URL}/dropdown/options`);
+        return response.data;
+    },
+
+    searchGenes: async (query?: string) => {
+        const response = await axios.get(`${API_BASE_URL}/dropdown/genes`, {
+            params: { query }
         });
         return response.data;
     },
 
-    getSurvivalData: async (gene: string) => {
-        const response = await axios.get(`${API_BASE_URL}/survival/${gene}`);
+    searchDatasets: async (genes?: string[]) => {
+        const response = await axios.get(`${API_BASE_URL}/dropdown/datasets`, {
+            params: { genes }
+        });
         return response.data;
     }
 };
