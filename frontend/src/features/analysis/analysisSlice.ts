@@ -18,20 +18,34 @@ interface DropdownData {
   };
 }
 
+interface MetadataColumn {
+  name: string;
+  unique_values: number;
+  type: string;
+}
+
 interface AnalysisState {
   dropdownData: DropdownData | null;
   selectedGene: string;
   selectedDataset: string;
+  selectedTarget: string;
+  metadataColumns: MetadataColumn[];
   loading: boolean;
   error: string | null;
+  metadataLoading: boolean;
+  metadataError: string | null;
 }
 
 const initialState: AnalysisState = {
   dropdownData: null,
   selectedGene: '',
   selectedDataset: '',
+  selectedTarget: '',
+  metadataColumns: [],
   loading: false,
-  error: null
+  error: null,
+  metadataLoading: false,
+  metadataError: null
 };
 
 export const fetchDropdownOptions = createAsyncThunk(
@@ -39,6 +53,14 @@ export const fetchDropdownOptions = createAsyncThunk(
   async () => {
     const response = await axios.get('http://localhost:8000/api/dropdown_routes/dropdown/options');
     return response.data;
+  }
+);
+
+export const fetchDatasetMetadata = createAsyncThunk(
+  'analysis/fetchDatasetMetadata',
+  async (datasetId: string) => {
+    const response = await axios.get(`http://localhost:8000/api/datasets/${datasetId}/metadata`);
+    return response.data.columns;
   }
 );
 
@@ -52,13 +74,19 @@ const analysisSlice = createSlice({
     setSelectedDataset: (state, action: PayloadAction<string>) => {
       state.selectedDataset = action.payload;
     },
+    setSelectedTarget: (state, action: PayloadAction<string>) => {
+      state.selectedTarget = action.payload;
+    },
     resetSelections: (state) => {
       state.selectedGene = '';
       state.selectedDataset = '';
+      state.selectedTarget = '';
+      state.metadataColumns = [];
     }
   },
   extraReducers: (builder) => {
     builder
+      // Dropdown options fetch cases
       .addCase(fetchDropdownOptions.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -70,9 +98,28 @@ const analysisSlice = createSlice({
       .addCase(fetchDropdownOptions.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message || 'Failed to fetch options';
+      })
+      // Dataset metadata fetch cases
+      .addCase(fetchDatasetMetadata.pending, (state) => {
+        state.metadataLoading = true;
+        state.metadataError = null;
+      })
+      .addCase(fetchDatasetMetadata.fulfilled, (state, action) => {
+        state.metadataLoading = false;
+        state.metadataColumns = action.payload;
+      })
+      .addCase(fetchDatasetMetadata.rejected, (state, action) => {
+        state.metadataLoading = false;
+        state.metadataError = action.error.message || 'Failed to fetch metadata';
       });
   }
 });
 
-export const { setSelectedGene, setSelectedDataset, resetSelections } = analysisSlice.actions;
+export const { 
+  setSelectedGene, 
+  setSelectedDataset, 
+  setSelectedTarget, 
+  resetSelections 
+} = analysisSlice.actions;
+
 export default analysisSlice.reducer;

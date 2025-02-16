@@ -350,5 +350,41 @@ class ExpressionEndpoints:
             },
         }
 
+    @cache.memoize(timeout=3600)
+    async def get_dataset_metadata(self, dataset_id: str) -> Dict:
+        """Get metadata columns with their properties"""
+        try:
+            # Get expression data with a sample gene to access metadata
+            # Using SIRT1 as a sample gene since it's in our longevity set
+            df_expr, df_meta = await self.get_expression_data(["SIRT1"], dataset_id)
+
+            if df_meta.empty:
+                return {
+                    "status": "error",
+                    "message": "No metadata available for this dataset",
+                    "columns": [],
+                }
+
+            # Analyze metadata columns
+            columns = []
+            for column in df_meta.columns:
+                if column != "sample_id":  # Exclude the index column
+                    unique_values = len(df_meta[column].unique())
+                    column_type = str(df_meta[column].dtype)
+
+                    columns.append(
+                        {
+                            "name": column,
+                            "unique_values": unique_values,
+                            "type": column_type,
+                        }
+                    )
+
+            return {"status": "success", "columns": columns}
+
+        except Exception as e:
+            logger.error(f"Error getting dataset metadata: {str(e)}")
+            return {"status": "error", "message": str(e), "columns": []}
+
 
 expression_endpoints = ExpressionEndpoints()

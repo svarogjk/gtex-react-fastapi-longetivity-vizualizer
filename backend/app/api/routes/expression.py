@@ -71,3 +71,19 @@ async def get_tissue_summary(gene: str):
     except Exception as e:
         logger.error(f"Error getting tissue summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Add to expression.py router section
+
+
+@router.get("/datasets/{dataset_id}/metadata")
+async def get_dataset_metadata(dataset_id: str):
+    """Get metadata information for a dataset"""
+    try:
+        result = await expression_endpoints.get_dataset_metadata(dataset_id)
+        if result["status"] == "error":
+            raise HTTPException(status_code=404, detail=result["message"])
+        return result
+    except Exception as e:
+        logger.error(f"Error getting dataset metadata: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
