@@ -1,11 +1,13 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
 from app.utils.helpers import validate_genes, validate_tissue, logger
 from app.api.endpoints.expression import expression_endpoints
 from app.services.search_service import SearchService
+from app.services.gtex_service import GTExService
 
 router = APIRouter()
 search_service = SearchService()
+gtex_service = GTExService()
 
 
 @router.get("/genes/expression")
@@ -67,13 +69,17 @@ async def get_tissue_summary(gene: str):
             raise HTTPException(status_code=400, detail="Invalid gene symbol")
 
         result = await expression_endpoints.get_tissue_expression_summary(gene)
+        if result["status"] == "error":
+            if "not found" in result["message"].lower():
+                raise HTTPException(status_code=404, detail=result["message"])
+            raise HTTPException(status_code=500, detail=result["message"])
+
         return result
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"Error getting tissue summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# Add to expression.py router section
 
 
 @router.get("/datasets/{dataset_id}/metadata")
@@ -86,4 +92,30 @@ async def get_dataset_metadata(dataset_id: str):
         return result
     except Exception as e:
         logger.error(f"Error getting dataset metadata: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/genes/{gene}/expression/{tissue}")
+async def get_gene_tissue_expression(gene: str, tissue: str):
+    """Get detailed expression data for a specific gene in a tissue"""
+    try:
+        if not validate_genes([gene]):
+            raise HTTPException(status_code=400, detail="Invalid gene symbol")
+
+        if not validate_tissue(tissue):
+            raise HTTPException(status_code=400, detail="Invalid tissue type")
+
+        df_expr, df_meta = await expression_endpoints.get_expression_data(
+            [gene], tissue
+        )
+        result = expression_endpoints.process_expression_data(df_expr, df_meta)
+
+        if result["status"] == "no_data":
+            raise HTTPException(status_code=404, detail="No expression data found")
+
+        return result
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error getting gene tissue expression: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

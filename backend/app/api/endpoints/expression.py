@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 import pandas as pd
 import numpy as np
 from fastapi import HTTPException
@@ -43,12 +43,16 @@ class ExpressionEndpoints:
 
         # Valid tissues from GTEx v8
         self.valid_tissues = {
-            "WHOLE_BLOOD": "Whole_Blood",
+            "WHOLE_BLOOD": "Whole Blood",
             "LIVER": "Liver",
-            "MUSCLE": "Muscle_Skeletal",
-            "BRAIN": "Brain_Cortex",
-            "HEART": "Heart_Left_Ventricle",
-            # Add more tissue mappings as needed
+            "MUSCLE_SKELETAL": "Skeletal Muscle",
+            "BRAIN_CORTEX": "Brain Cortex",
+            "HEART_LEFT_VENTRICLE": "Heart Left Ventricle",
+            "LUNG": "Lung",
+            "KIDNEY_CORTEX": "Kidney Cortex",
+            "ADIPOSE_SUBCUTANEOUS": "Subcutaneous Adipose",
+            "SKIN_SUN_EXPOSED": "Sun-Exposed Skin",
+            "THYROID": "Thyroid",
         }
 
     async def _make_request(
@@ -241,7 +245,7 @@ class ExpressionEndpoints:
             return {"status": "error", "message": str(e)}
 
     @cache.memoize(timeout=3600)
-    async def get_available_tissues(self) -> Dict[str, List[str]]:
+    async def get_available_tissues(self) -> Dict[str, Any]:
         """Get list of available tissues with categories"""
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -251,58 +255,170 @@ class ExpressionEndpoints:
                 )
 
                 if not data or "data" not in data:
-                    return {"tissues": [], "categories": {}}
+                    return {
+                        "tissues": list(self.valid_tissues.keys()),
+                        "categories": {},
+                    }
 
-                tissues = data["data"]
-
-                # Organize tissues by category
+                # Process tissue data and organize by category
                 categories = {}
-                tissue_list = []
+                for tissue_id, display_name in self.valid_tissues.items():
+                    category = self._get_tissue_category(tissue_id)
+                    if category not in categories:
+                        categories[category] = []
+                    categories[category].append({"id": tissue_id, "name": display_name})
 
-                for tissue in tissues:
-                    tissue_id = tissue.get("tissueSiteDetailId")
-                    category = tissue.get("tissueSiteDetail", "Other")
-
-                    if tissue_id:
-                        tissue_list.append(tissue_id)
-                        if category not in categories:
-                            categories[category] = []
-                        categories[category].append(tissue_id)
-
-                return {"tissues": sorted(tissue_list), "categories": categories}
+                return {
+                    "tissues": list(self.valid_tissues.keys()),
+                    "categories": categories,
+                }
 
         except Exception as e:
             logger.error(f"Error getting tissues: {str(e)}")
             return {"tissues": [], "categories": {}}
 
+    def _get_tissue_category(self, tissue_id: str) -> str:
+        """Get category for a tissue based on its ID"""
+        categories = {
+            "BRAIN": "Brain",
+            "HEART": "Cardiovascular",
+            "MUSCLE": "Muscle",
+            "ADIPOSE": "Fat",
+            "SKIN": "Skin",
+            "BLOOD": "Blood",
+            "LIVER": "Digestive",
+            "KIDNEY": "Urinary",
+            "LUNG": "Respiratory",
+            "THYROID": "Endocrine",
+        }
+
+        for key, category in categories.items():
+            if key in tissue_id:
+                return category
+        return "Other"
+
     @cache.memoize(timeout=3600)
     async def get_tissue_expression_summary(self, gene: str) -> Dict:
-        """Get expression summary across all tissues for a gene"""
+        """Get expression summary across tissues for a gene"""
         try:
-            tissues = await self.get_available_tissues()
-            tissue_list = tissues["tissues"][:5]  # Limit to 5 tissues for example
+            # Get Gencode ID for the gene
+            gencode_id = await self.get_gencode_id(gene)
 
-            results = []
-            for tissue in tissue_list:
-                df_expr, _ = await self.get_expression_data([gene], tissue)
-                if not df_expr.empty and gene in df_expr.columns:
-                    results.append(
-                        {
-                            "tissue": tissue,
-                            "mean_expression": float(df_expr[gene].mean()),
-                            "median_expression": float(df_expr[gene].median()),
-                            "std_expression": float(df_expr[gene].std()),
-                        }
+            if not gencode_id:
+                logger.error(f"Could not find Gencode ID for gene {gene}")
+                return {
+                    "status": "error",
+                    "message": f"Gene {gene} not found",
+                    "data": {"gene": gene, "tissue_expression": []},
+                }
+
+            logger.info(f"Found Gencode ID for {gene}: {gencode_id}")
+            available_tissues = list(self.valid_tissues.keys())
+
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                # Get expression data for all tissues
+                url = f"{self.base_url}/expression/medianGeneExpression"  # Changed endpoint
+                params = {
+                    "gencodeId": [gencode_id],
+                    "tissueSiteDetailId": available_tissues,
+                    "datasetId": self.dataset,
+                    "format": "json",
+                }
+
+                logger.info(f"Requesting expression data with params: {params}")
+                data = await self._make_request(client, url, params)
+
+                if not data:
+                    logger.error("No response data received")
+                    return {
+                        "status": "error",
+                        "message": "No response from expression service",
+                        "data": {"gene": gene, "tissue_expression": []},
+                    }
+
+                if "data" not in data or not data["data"]:
+                    logger.error(f"No expression data found in response: {data}")
+                    return {
+                        "status": "error",
+                        "message": "No expression data found",
+                        "data": {"gene": gene, "tissue_expression": []},
+                    }
+
+                # Process expression data
+                tissue_expression = []
+                for tissue_data in data["data"]:
+                    tissue_id = tissue_data.get("tissueSiteDetailId")
+                    median_expression = tissue_data.get("median")
+
+                    if (
+                        tissue_id in self.valid_tissues
+                        and median_expression is not None
+                    ):
+                        tissue_expression.append(
+                            {
+                                "tissue": tissue_id,
+                                "display_name": self.valid_tissues[tissue_id],
+                                "median_expression": float(median_expression),
+                            }
+                        )
+
+                # Sort tissues by median expression
+                tissue_expression.sort(
+                    key=lambda x: x["median_expression"], reverse=True
+                )
+
+                if not tissue_expression:
+                    logger.warning(
+                        f"No valid tissue expression data found for gene {gene}"
                     )
+                    return {
+                        "status": "error",
+                        "message": "No tissue expression data found",
+                        "data": {"gene": gene, "tissue_expression": []},
+                    }
 
-            return {
-                "status": "success",
-                "data": {"gene": gene, "tissue_expression": results},
-            }
+                return {
+                    "status": "success",
+                    "data": {
+                        "gene": gene,
+                        "gencode_id": gencode_id,
+                        "tissue_expression": tissue_expression,
+                    },
+                }
 
         except Exception as e:
             logger.error(f"Error getting tissue expression summary: {str(e)}")
-            return {"status": "error", "message": str(e)}
+            return {
+                "status": "error",
+                "message": str(e),
+                "data": {"gene": gene, "tissue_expression": []},
+            }
+
+    async def get_gencode_id(self, gene_symbol: str) -> Optional[str]:
+        """Get Gencode ID for a gene symbol including version"""
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                url = f"{self.base_url}/reference/gene"
+                params = {
+                    "geneSymbol": gene_symbol,
+                    "format": "json",
+                }  # Changed from geneId to geneSymbol
+
+                logger.info(f"Requesting Gencode ID for gene {gene_symbol}")
+                data = await self._make_request(client, url, params)
+
+                if not data or "data" not in data or not data["data"]:
+                    logger.warning(f"No Gencode ID found for gene {gene_symbol}")
+                    return None
+
+                gene_data = data["data"][0]
+                gencode_id = gene_data.get("gencodeId")
+                logger.info(f"Found Gencode ID for {gene_symbol}: {gencode_id}")
+                return gencode_id
+
+        except Exception as e:
+            logger.error(f"Error getting Gencode ID for {gene_symbol}: {str(e)}")
+            return None
 
     def process_expression_data(
         self, df_expr: pd.DataFrame, df_meta: pd.DataFrame

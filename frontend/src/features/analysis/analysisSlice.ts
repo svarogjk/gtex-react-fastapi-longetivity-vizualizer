@@ -1,66 +1,55 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-interface DropdownOption {
-  value: string;
-  label: string;
-  details?: Record<string, any>;
-}
-
-interface DropdownData {
-  genes: {
-    options: DropdownOption[];
-    total_count: number;
-  };
-  datasets: {
-    options: DropdownOption[];
-    total_count: number;
-  };
-}
-
-interface MetadataColumn {
-  name: string;
-  unique_values: number;
-  type: string;
-}
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { api } from '../../services/api';
 
 interface AnalysisState {
-  dropdownData: DropdownData | null;
-  selectedGene: string;
-  selectedDataset: string;
-  selectedTarget: string;
-  metadataColumns: MetadataColumn[];
+  dropdownData: any;
   loading: boolean;
   error: string | null;
-  metadataLoading: boolean;
-  metadataError: string | null;
+  selectedGene: string;
+  selectedTissue: string;
+  selectedDataset: string;
+  selectedTarget: string;
+  tissues: string[];
+  metadataColumns: Array<{
+    name: string;
+    unique_values: number;
+    type: string;
+  }>;
 }
 
 const initialState: AnalysisState = {
   dropdownData: null,
-  selectedGene: '',
-  selectedDataset: '',
-  selectedTarget: '',
-  metadataColumns: [],
   loading: false,
   error: null,
-  metadataLoading: false,
-  metadataError: null
+  selectedGene: '',
+  selectedTissue: '',
+  selectedDataset: '',
+  selectedTarget: '',
+  tissues: [],
+  metadataColumns: [],
 };
 
 export const fetchDropdownOptions = createAsyncThunk(
   'analysis/fetchDropdownOptions',
   async () => {
-    const response = await axios.get('http://localhost:8000/api/dropdown_routes/dropdown/options');
-    return response.data;
+    const response = await api.getDropdownOptions();
+    return response;
+  }
+);
+
+export const fetchTissues = createAsyncThunk(
+  'analysis/fetchTissues',
+  async (gene: string) => {
+    const response = await api.getTissues(gene);
+    return response.tissues;
   }
 );
 
 export const fetchDatasetMetadata = createAsyncThunk(
   'analysis/fetchDatasetMetadata',
   async (datasetId: string) => {
-    const response = await axios.get(`http://localhost:8000/api/datasets/${datasetId}/metadata`);
-    return response.data.columns;
+    const response = await api.getDatasetMetadata(datasetId);
+    return response.columns;
   }
 );
 
@@ -68,25 +57,22 @@ const analysisSlice = createSlice({
   name: 'analysis',
   initialState,
   reducers: {
-    setSelectedGene: (state, action: PayloadAction<string>) => {
+    setSelectedGene: (state, action) => {
       state.selectedGene = action.payload;
     },
-    setSelectedDataset: (state, action: PayloadAction<string>) => {
+    setSelectedTissue: (state, action) => {
+      state.selectedTissue = action.payload;
+    },
+    setSelectedDataset: (state, action) => {
       state.selectedDataset = action.payload;
     },
-    setSelectedTarget: (state, action: PayloadAction<string>) => {
+    setSelectedTarget: (state, action) => {
       state.selectedTarget = action.payload;
     },
-    resetSelections: (state) => {
-      state.selectedGene = '';
-      state.selectedDataset = '';
-      state.selectedTarget = '';
-      state.metadataColumns = [];
-    }
   },
   extraReducers: (builder) => {
     builder
-      // Dropdown options fetch cases
+      // Dropdown Options
       .addCase(fetchDropdownOptions.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -97,29 +83,42 @@ const analysisSlice = createSlice({
       })
       .addCase(fetchDropdownOptions.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || 'Failed to fetch options';
+        state.error = action.error.message || 'Failed to fetch dropdown options';
       })
-      // Dataset metadata fetch cases
+      // Tissues
+      .addCase(fetchTissues.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchTissues.fulfilled, (state, action) => {
+        state.loading = false;
+        state.tissues = action.payload;
+      })
+      .addCase(fetchTissues.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to fetch tissues';
+      })
+      // Dataset Metadata
       .addCase(fetchDatasetMetadata.pending, (state) => {
-        state.metadataLoading = true;
-        state.metadataError = null;
+        state.loading = true;
+        state.error = null;
       })
       .addCase(fetchDatasetMetadata.fulfilled, (state, action) => {
-        state.metadataLoading = false;
+        state.loading = false;
         state.metadataColumns = action.payload;
       })
       .addCase(fetchDatasetMetadata.rejected, (state, action) => {
-        state.metadataLoading = false;
-        state.metadataError = action.error.message || 'Failed to fetch metadata';
+        state.loading = false;
+        state.error = action.error.message || 'Failed to fetch dataset metadata';
       });
-  }
+  },
 });
 
 export const { 
   setSelectedGene, 
+  setSelectedTissue,
   setSelectedDataset, 
-  setSelectedTarget, 
-  resetSelections 
+  setSelectedTarget 
 } = analysisSlice.actions;
 
 export default analysisSlice.reducer;

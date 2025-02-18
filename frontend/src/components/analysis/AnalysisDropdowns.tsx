@@ -1,4 +1,3 @@
-// src/components/analysis/AnalysisDropdowns.tsx
 import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { 
@@ -6,41 +5,21 @@ import {
   setSelectedGene, 
   setSelectedDataset,
   setSelectedTarget,
-  fetchDatasetMetadata 
+  fetchDatasetMetadata,
+  setSelectedTissue,
+  fetchTissues
 } from '../../features/analysis/analysisSlice';
-import { Card, CardContent } from '../../components/ui/card';
-import { Label } from '../../components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../components/ui/select';
+} from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
-interface DropdownOption {
-  value: string;
-  label: string;
-  details?: Record<string, any>;
-}
-
-interface DropdownData {
-  genes: {
-    options: DropdownOption[];
-    total_count: number;
-  };
-  datasets: {
-    options: DropdownOption[];
-    total_count: number;
-  };
-}
-
-interface MetadataColumn {
-  name: string;
-  unique_values: number;
-  type: string;
-}
+import { AlertCircle } from 'lucide-react';
 
 export const AnalysisDropdowns = () => {
   const dispatch = useAppDispatch();
@@ -51,13 +30,22 @@ export const AnalysisDropdowns = () => {
     selectedGene, 
     selectedDataset,
     selectedTarget,
+    selectedTissue,
+    tissues,
     metadataColumns 
   } = useAppSelector((state) => state.analysis);
 
-  // Initial load of gene options
+  // Initial load of dropdown options
   useEffect(() => {
     dispatch(fetchDropdownOptions());
   }, [dispatch]);
+
+  // Fetch tissues when gene is selected
+  useEffect(() => {
+    if (selectedGene) {
+      dispatch(fetchTissues(selectedGene));
+    }
+  }, [selectedGene, dispatch]);
 
   // Fetch dataset metadata when dataset is selected
   useEffect(() => {
@@ -69,6 +57,13 @@ export const AnalysisDropdowns = () => {
   // Reset dependent selections when parent selection changes
   const handleGeneChange = (value: string) => {
     dispatch(setSelectedGene(value));
+    dispatch(setSelectedTissue(''));
+    dispatch(setSelectedDataset(''));
+    dispatch(setSelectedTarget(''));
+  };
+
+  const handleTissueChange = (value: string) => {
+    dispatch(setSelectedTissue(value));
     dispatch(setSelectedDataset(''));
     dispatch(setSelectedTarget(''));
   };
@@ -78,109 +73,100 @@ export const AnalysisDropdowns = () => {
     dispatch(setSelectedTarget(''));
   };
 
-  if (loading) {
-    return (
-      <Card className="w-64 p-4">
-        <CardContent className="space-y-4">
-          <div className="h-20 animate-pulse bg-gray-200 rounded" />
-          <div className="h-20 animate-pulse bg-gray-200 rounded" />
-          <div className="h-20 animate-pulse bg-gray-200 rounded" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="w-64 p-4">
-        <CardContent>
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
-
   // Filter metadata columns for valid target variables (2-10 unique values)
   const validTargetColumns = metadataColumns?.filter(
     column => column.unique_values >= 2 && column.unique_values <= 10
   ) || [];
 
+  if (loading) {
+    return (
+      <Card className="w-64">
+        <CardContent className="p-6 space-y-4">
+          <div className="h-20 animate-pulse bg-gray-200 rounded" />
+          <div className="h-20 animate-pulse bg-gray-200 rounded" />
+          <div className="h-20 animate-pulse bg-gray-200 rounded" />
+          <div className="h-20 animate-pulse bg-gray-200 rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="w-64">
-      <CardContent className="p-4 space-y-6">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Step 1. Select Gene</Label>
-          <Select
-            value={selectedGene}
-            onValueChange={handleGeneChange}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Search genes..." />
-            </SelectTrigger>
-            <SelectContent>
-              {dropdownData?.genes.options.map((option) => (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                  className="cursor-pointer"
-                >
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <Card className="w-64 bg-white">
+      <CardContent className="p-6 space-y-6">
+        <h2 className="text-lg font-semibold text-gray-900">Analysis Steps</h2>
+
+        <div className="space-y-6">
+          {/* Gene Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">1. Select Gene</Label>
+            <Select
+              value={selectedGene}
+              onValueChange={handleGeneChange}
+            >
+              <SelectTrigger className="w-full bg-white">
+                <SelectValue placeholder="Choose a gene..." />
+              </SelectTrigger>
+              <SelectContent>
+                {dropdownData?.genes?.options?.map((option) => (
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    className="cursor-pointer hover:bg-gray-100"
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tissue Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">2. Select Tissue</Label>
+            <Select
+              value={selectedTissue}
+              onValueChange={handleTissueChange}
+              disabled={!selectedGene || tissues.length === 0}
+            >
+              <SelectTrigger className="w-full bg-white">
+                <SelectValue placeholder={
+                  !selectedGene 
+                    ? "Select a gene first" 
+                    : tissues.length === 0 
+                      ? "No tissues available" 
+                      : "Choose a tissue..."
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                {tissues?.map((tissue: string) => (
+                  <SelectItem
+                    key={tissue}
+                    value={tissue}
+                    className="cursor-pointer hover:bg-gray-100"
+                  >
+                    {tissue.replace(/_/g, ' ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedGene && tissues.length === 0 && (
+              <p className="text-sm text-gray-500">No tissues available for this gene</p>
+            )}
+          </div>
+
+          {/* Rest of the component remains the same */}
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Step 2. Select Dataset</Label>
-          <Select
-            value={selectedDataset}
-            onValueChange={handleDatasetChange}
-            disabled={!selectedGene}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select dataset..." />
-            </SelectTrigger>
-            <SelectContent>
-              {dropdownData?.datasets.options.map((option) => (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                  className="cursor-pointer"
-                >
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Step 3. Select Target Variable</Label>
-          <Select
-            value={selectedTarget}
-            onValueChange={(value) => dispatch(setSelectedTarget(value))}
-            disabled={!selectedDataset}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select target..." />
-            </SelectTrigger>
-            <SelectContent>
-              {validTargetColumns.map((column) => (
-                <SelectItem
-                  key={column.name}
-                  value={column.name}
-                  className="cursor-pointer"
-                >
-                  {`${column.name} (${column.unique_values} values)`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {error && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   );
 };
+
+export default AnalysisDropdowns;
