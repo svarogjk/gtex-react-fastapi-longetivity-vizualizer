@@ -1,10 +1,9 @@
+from tenacity import retry, stop_after_attempt, wait_exponential
 from typing import List, Dict, Optional, Tuple, Any
 import pandas as pd
-import numpy as np
-from fastapi import HTTPException
+import json
 from app.utils.helpers import logger
 from app.server_cache.cache_manager import cache
-from app.services.search_service import SearchService
 import httpx
 from asyncio import gather
 
@@ -12,94 +11,105 @@ from asyncio import gather
 class ExpressionEndpoints:
     def __init__(self):
         self.base_url = "https://gtexportal.org/api/v2"
-        self.headers = {"Accept": "application/json", "User-Agent": "Mozilla/5.0"}
-        self.timeout = 30.0
+        self.headers = {
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (compatible; Research/1.0)",
+            "Content-Type": "application/json",
+        }
+        self.timeout = httpx.Timeout(30.0, connect=10.0)
         self.dataset = "gtex_v8"
-        self.max_retries = 3
+        self.limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
 
-        # Define longevity-related genes and pathways
-        self.longevity_genes = {
-            "SIRT1",
-            "SIRT2",
-            "SIRT3",
-            "SIRT4",
-            "SIRT5",
-            "SIRT6",
-            "SIRT7",
-            "FOXO1",
-            "FOXO3",
-            "FOXO4",
-            "CDKN2A",
-            "CDKN2B",
-            "TERT",
-            "APOE",
-            "IGF1",
-            "IGF1R",
-            "MTOR",
-            "AMPK",
-            "PGC1A",
-            "KLOTHO",
+        # Configure client defaults
+        self.client_kwargs = {
+            "timeout": self.timeout,
+            "headers": self.headers,
+            "limits": self.limits,
+            "follow_redirects": True,
         }
 
-        # Valid tissues from GTEx v8
+        # Add valid tissues map
         self.valid_tissues = {
-            "WHOLE_BLOOD": "Whole Blood",
-            "LIVER": "Liver",
-            "MUSCLE_SKELETAL": "Skeletal Muscle",
-            "BRAIN_CORTEX": "Brain Cortex",
-            "HEART_LEFT_VENTRICLE": "Heart Left Ventricle",
-            "LUNG": "Lung",
-            "KIDNEY_CORTEX": "Kidney Cortex",
-            "ADIPOSE_SUBCUTANEOUS": "Subcutaneous Adipose",
-            "SKIN_SUN_EXPOSED": "Sun-Exposed Skin",
-            "THYROID": "Thyroid",
+            "Adipose_Subcutaneous": "Subcutaneous Adipose",
+            "Adipose_Visceral_Omentum": "Visceral Adipose",
+            "Adrenal_Gland": "Adrenal Gland",
+            "Artery_Aorta": "Aorta",
+            "Artery_Coronary": "Coronary Artery",
+            "Artery_Tibial": "Tibial Artery",
+            "Brain_Amygdala": "Amygdala",
+            "Brain_Anterior_cingulate_cortex_BA24": "Anterior Cingulate Cortex",
+            "Brain_Caudate_basal_ganglia": "Caudate",
+            "Brain_Cerebellar_Hemisphere": "Cerebellar Hemisphere",
+            "Brain_Cerebellum": "Cerebellum",
+            "Brain_Cortex": "Cortex",
+            "Brain_Frontal_Cortex_BA9": "Frontal Cortex",
+            "Brain_Hippocampus": "Hippocampus",
+            "Brain_Hypothalamus": "Hypothalamus",
+            "Brain_Nucleus_accumbens_basal_ganglia": "Nucleus Accumbens",
+            "Brain_Putamen_basal_ganglia": "Putamen",
+            "Brain_Spinal_cord_cervical_c-1": "Spinal Cord",
+            "Brain_Substantia_nigra": "Substantia Nigra",
+            "Breast_Mammary_Tissue": "Breast",
+            "Cells_Cultured_fibroblasts": "Fibroblasts",
+            "Cells_EBV-transformed_lymphocytes": "Lymphoblasts",
+            "Colon_Sigmoid": "Sigmoid Colon",
+            "Colon_Transverse": "Transverse Colon",
+            "Esophagus_Gastroesophageal_Junction": "Gastroesophageal Junction",
+            "Esophagus_Mucosa": "Esophagus Mucosa",
+            "Esophagus_Muscularis": "Esophagus Muscularis",
+            "Heart_Atrial_Appendage": "Heart Atrial Appendage",
+            "Heart_Left_Ventricle": "Heart Left Ventricle",
+            "Kidney_Cortex": "Kidney Cortex",
+            "Liver": "Liver",
+            "Lung": "Lung",
+            "Minor_Salivary_Gland": "Minor Salivary Gland",
+            "Muscle_Skeletal": "Skeletal Muscle",
+            "Nerve_Tibial": "Tibial Nerve",
+            "Ovary": "Ovary",
+            "Pancreas": "Pancreas",
+            "Pituitary": "Pituitary",
+            "Prostate": "Prostate",
+            "Skin_Not_Sun_Exposed_Suprapubic": "Skin Not Sun Exposed",
+            "Skin_Sun_Exposed_Lower_leg": "Skin Sun Exposed",
+            "Small_Intestine_Terminal_Ileum": "Small Intestine",
+            "Spleen": "Spleen",
+            "Stomach": "Stomach",
+            "Testis": "Testis",
+            "Thyroid": "Thyroid",
+            "Uterus": "Uterus",
+            "Vagina": "Vagina",
+            "Whole_Blood": "Whole Blood",
         }
 
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Create a configured HTTP client"""
+        return httpx.AsyncClient(**self.client_kwargs)
+
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10)
+    )
     async def _make_request(
         self, client: httpx.AsyncClient, url: str, params: Dict = None
     ) -> Optional[Dict]:
         """Make HTTP request with retry logic"""
-        for attempt in range(self.max_retries):
-            try:
-                response = await client.get(url, params=params, headers=self.headers)
-                logger.info(f"Full URL: {response.url}")
+        try:
+            response = await client.get(url, params=params)
+            response.raise_for_status()  # Raise exception for 4xx/5xx status codes
 
-                if response.status_code == 200:
-                    return response.json()
-                elif response.status_code == 404:
-                    logger.warning(f"Resource not found: {url}")
-                    return None
-                elif response.status_code == 422:
-                    logger.error(f"Invalid request: {response.text}")
-                    return None
-                elif response.status_code >= 500:
-                    if attempt < self.max_retries - 1:
-                        continue
-                logger.error(
-                    f"Request failed: {response.status_code} - {response.text}"
-                )
-                return None
-            except Exception as e:
-                logger.error(f"Request error: {str(e)}")
-                if attempt == self.max_retries - 1:
-                    return None
-        return None
+            logger.info(f"Successful request to {response.url}")
+            return response.json()
 
-    @cache.memoize(timeout=3600)
-    async def get_gencode_id(self, gene_symbol: str) -> Optional[str]:
-        """Get Gencode ID for a gene symbol including version"""
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            url = f"{self.base_url}/reference/gene"
-            params = {"geneId": gene_symbol, "format": "json"}
-
-            data = await self._make_request(client, url, params)
-            if not data or "data" not in data or not data["data"]:
-                return None
-
-            gene_data = data["data"][0]
-            gencode_id = gene_data.get("gencodeId")
-            logger.info(f"Found Gencode ID for {gene_symbol}: {gencode_id}")
-            return gencode_id
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"HTTP error occurred: {e.response.status_code} - {e.response.text}"
+            )
+            raise
+        except httpx.RequestError as e:
+            logger.error(f"Request error occurred: {str(e)}")
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {str(e)}")
+            raise
 
     @cache.memoize(timeout=3600)
     async def get_expression_data(
@@ -301,76 +311,65 @@ class ExpressionEndpoints:
     async def get_tissue_expression_summary(self, gene: str) -> Dict:
         """Get expression summary across tissues for a gene"""
         try:
-            # Get Gencode ID for the gene
             gencode_id = await self.get_gencode_id(gene)
+            logger.info(f"Gencode ID lookup for {gene}: {gencode_id}")
 
             if not gencode_id:
-                logger.error(f"Could not find Gencode ID for gene {gene}")
                 return {
                     "status": "error",
-                    "message": f"Gene {gene} not found",
+                    "message": f"Gene {gene} not found in GTEx database",
                     "data": {"gene": gene, "tissue_expression": []},
                 }
 
-            logger.info(f"Found Gencode ID for {gene}: {gencode_id}")
-            available_tissues = list(self.valid_tissues.keys())
-
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                # Get expression data for all tissues
-                url = f"{self.base_url}/expression/medianGeneExpression"  # Changed endpoint
+                # Updated endpoint for tissue expression with correct parameter name
+                url = f"{self.base_url}/expression/medianTranscriptExpression"
                 params = {
-                    "gencodeId": [gencode_id],
-                    "tissueSiteDetailId": available_tissues,
-                    "datasetId": self.dataset,
+                    "datasetId": "gtex_v8",
+                    "gencodeId": gencode_id,  # Changed from geneId to gencodeId
                     "format": "json",
                 }
 
-                logger.info(f"Requesting expression data with params: {params}")
-                data = await self._make_request(client, url, params)
+                logger.info(f"Requesting expression data: {url} with params {params}")
+                response = await client.get(url, params=params, headers=self.headers)
 
-                if not data:
-                    logger.error("No response data received")
+                if response.status_code != 200:
+                    logger.error(
+                        f"GTEx API error: {response.status_code} - {response.text}"
+                    )
                     return {
                         "status": "error",
-                        "message": "No response from expression service",
+                        "message": "Failed to retrieve expression data",
                         "data": {"gene": gene, "tissue_expression": []},
                     }
 
-                if "data" not in data or not data["data"]:
-                    logger.error(f"No expression data found in response: {data}")
+                data = response.json()
+
+                if not data or "data" not in data:
+                    logger.error(f"Unexpected GTEx API response: {data}")
                     return {
                         "status": "error",
-                        "message": "No expression data found",
+                        "message": "Invalid response from GTEx API",
                         "data": {"gene": gene, "tissue_expression": []},
                     }
 
-                # Process expression data
                 tissue_expression = []
                 for tissue_data in data["data"]:
                     tissue_id = tissue_data.get("tissueSiteDetailId")
-                    median_expression = tissue_data.get("median")
-
-                    if (
-                        tissue_id in self.valid_tissues
-                        and median_expression is not None
-                    ):
+                    if tissue_id in self.valid_tissues:
                         tissue_expression.append(
                             {
                                 "tissue": tissue_id,
                                 "display_name": self.valid_tissues[tissue_id],
-                                "median_expression": float(median_expression),
+                                "median_expression": float(
+                                    tissue_data.get("median", 0)
+                                ),
+                                "tissue_name": tissue_data.get("tissueSiteDetail", ""),
+                                "sample_count": tissue_data.get("sampleCount", 0),
                             }
                         )
 
-                # Sort tissues by median expression
-                tissue_expression.sort(
-                    key=lambda x: x["median_expression"], reverse=True
-                )
-
                 if not tissue_expression:
-                    logger.warning(
-                        f"No valid tissue expression data found for gene {gene}"
-                    )
                     return {
                         "status": "error",
                         "message": "No tissue expression data found",
@@ -382,12 +381,16 @@ class ExpressionEndpoints:
                     "data": {
                         "gene": gene,
                         "gencode_id": gencode_id,
-                        "tissue_expression": tissue_expression,
+                        "tissue_expression": sorted(
+                            tissue_expression,
+                            key=lambda x: x["median_expression"],
+                            reverse=True,
+                        ),
                     },
                 }
 
         except Exception as e:
-            logger.error(f"Error getting tissue expression summary: {str(e)}")
+            logger.error(f"Error in tissue expression summary: {str(e)}")
             return {
                 "status": "error",
                 "message": str(e),
@@ -395,26 +398,35 @@ class ExpressionEndpoints:
             }
 
     async def get_gencode_id(self, gene_symbol: str) -> Optional[str]:
-        """Get Gencode ID for a gene symbol including version"""
+        """Get Gencode ID for a gene symbol"""
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 url = f"{self.base_url}/reference/gene"
-                params = {
-                    "geneSymbol": gene_symbol,
-                    "format": "json",
-                }  # Changed from geneId to geneSymbol
+                params = {"geneId": gene_symbol.upper(), "pageSize": 1}
 
-                logger.info(f"Requesting Gencode ID for gene {gene_symbol}")
-                data = await self._make_request(client, url, params)
+                logger.info(
+                    f"Requesting gene info from GTEx: {url} with params {params}"
+                )
+                response = await client.get(url, params=params, headers=self.headers)
 
-                if not data or "data" not in data or not data["data"]:
-                    logger.warning(f"No Gencode ID found for gene {gene_symbol}")
-                    return None
+                if response.status_code == 200:
+                    data = response.json()
+                    if (
+                        data
+                        and isinstance(data, dict)
+                        and "data" in data
+                        and data["data"]
+                    ):
+                        gene_data = data["data"][0]
+                        gencode_id = gene_data.get("gencodeId")
+                        if gencode_id:
+                            logger.info(
+                                f"Found Gencode ID for {gene_symbol}: {gencode_id}"
+                            )
+                            return gencode_id
 
-                gene_data = data["data"][0]
-                gencode_id = gene_data.get("gencodeId")
-                logger.info(f"Found Gencode ID for {gene_symbol}: {gencode_id}")
-                return gencode_id
+                logger.warning(f"No Gencode ID found for gene {gene_symbol}")
+                return None
 
         except Exception as e:
             logger.error(f"Error getting Gencode ID for {gene_symbol}: {str(e)}")

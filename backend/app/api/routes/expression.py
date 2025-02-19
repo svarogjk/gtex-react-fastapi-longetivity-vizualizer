@@ -1,3 +1,5 @@
+import re
+import httpx
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
 from app.utils.helpers import validate_genes, validate_tissue, logger
@@ -61,27 +63,6 @@ async def get_tissues():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/genes/{gene}/tissue-summary")
-async def get_tissue_summary(gene: str):
-    """Get expression summary across tissues for a gene"""
-    try:
-        if not validate_genes([gene]):
-            raise HTTPException(status_code=400, detail="Invalid gene symbol")
-
-        result = await expression_endpoints.get_tissue_expression_summary(gene)
-        if result["status"] == "error":
-            if "not found" in result["message"].lower():
-                raise HTTPException(status_code=404, detail=result["message"])
-            raise HTTPException(status_code=500, detail=result["message"])
-
-        return result
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        logger.error(f"Error getting tissue summary: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/datasets/{dataset_id}/metadata")
 async def get_dataset_metadata(dataset_id: str):
     """Get metadata information for a dataset"""
@@ -119,3 +100,103 @@ async def get_gene_tissue_expression(gene: str, tissue: str):
     except Exception as e:
         logger.error(f"Error getting gene tissue expression: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/genes/{gene}/tissue-summary")
+async def get_tissue_summary(gene: str):
+    """Get expression summary across tissues for a gene"""
+    try:
+        # Validate gene symbol format
+        if not re.match(r"^[A-Za-z0-9-]+$", gene):
+            raise HTTPException(
+                status_code=400, detail=f"Invalid gene symbol format: {gene}"
+            )
+
+        result = await expression_endpoints.get_tissue_expression_summary(gene)
+
+        # Handle different error cases
+        if result["status"] == "error":
+            if "not found" in result["message"].lower():
+                raise HTTPException(
+                    status_code=404, detail=f"Gene {gene} not found in GTEx database"
+                )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error processing gene {gene}: {result['message']}",
+            )
+
+        return result
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error getting tissue summary: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal server error processing gene {gene}"
+        )
+
+
+@router.get("/debug/gtex/{gene}")
+async def debug_gtex_api(gene: str):
+    """Debug endpoint to test GTEx API connections"""
+    async with httpx.AsyncClient() as client:
+        results = {}
+
+        # Test gene lookup with new format
+        gene_url = f"{expression_endpoints.base_url}/reference/gene"
+        gene_params = {"geneId": gene.upper(), "pageSize": 1}
+
+        try:
+            gene_response = await client.get(
+                gene_url, params=gene_params, headers=expression_endpoints.headers
+            )
+            results["gene_lookup"] = {
+                "url": str(gene_response.url),
+                "status": gene_response.status_code,
+                "headers": dict(gene_response.headers),
+                "response": gene_response.text[:500],
+            }
+        except Exception as e:
+            results["gene_lookup"] = {"error": str(e)}
+
+        # Test alternative lookup format
+        alt_params = {"geneId": f"ENSG00000146648.{gene.upper()}", "pageSize": 1}
+
+        try:
+            alt_response = await client.get(
+                gene_url, params=alt_params, headers=expression_endpoints.headers
+            )
+            results["alternative_lookup"] = {
+                "url": str(alt_response.url),
+                "status": alt_response.status_code,
+                "headers": dict(alt_response.headers),
+                "response": alt_response.text[:500],
+            }
+        except Exception as e:
+            results["alternative_lookup"] = {"error": str(e)}
+
+        # Test expression endpoint
+        expr_url = (
+            f"{expression_endpoints.base_url}/expression/medianTranscriptExpression"
+        )
+        expr_params = {"datasetId": "gtex_v8", "geneId": gene.upper(), "format": "json"}
+
+        try:
+            expr_response = await client.get(
+                expr_url, params=expr_params, headers=expression_endpoints.headers
+            )
+            results["expression_lookup"] = {
+                "url": str(expr_response.url),
+                "status": expr_response.status_code,
+                "headers": dict(expr_response.headers),
+                "response": expr_response.text[:500],
+            }
+        except Exception as e:
+            results["expression_lookup"] = {"error": str(e)}
+
+        return {
+            "status": "success",
+            "results": results,
+            "base_url": expression_endpoints.base_url,
+            "headers": expression_endpoints.headers,
+        }
