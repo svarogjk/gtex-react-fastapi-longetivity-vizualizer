@@ -4,11 +4,6 @@ export interface GeneExpressionData {
     tissue: string;
 }
 
-export interface SurvivalData {
-    time: number[];
-    event: number[];
-    expression: number[];
-}
 
 export interface ApiResponse<T> {
     data: T;

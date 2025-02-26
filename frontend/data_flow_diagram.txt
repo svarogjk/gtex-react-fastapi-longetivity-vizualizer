@@ -1,0 +1,31 @@
+sequenceDiagram
+    participant User
+    participant UI as UI Components
+    participant Redux as Redux Store
+    participant API as API Service
+    participant Backend
+    
+    User->>UI: Select Gene
+    UI->>Redux: dispatch(setSelectedGene())
+    Redux->>UI: Update UI with selected gene
+    UI->>Redux: dispatch(fetchTissueExpression())
+    Redux->>API: Request tissue expression data
+    API->>Backend: GET /genes/{gene}/tissue-summary
+    Backend->>API: Return tissue expression data
+    API->>Redux: Return results
+    Redux->>UI: Update UI with tissue expression data
+    UI->>User: Display tissue expression chart
+    
+    User->>UI: Select Tissue
+    UI->>Redux: dispatch(setSelectedTissue())
+    Redux->>UI: Update UI with selected tissue
+    
+    Note over User,Backend: Optional Gene Expression Flow
+    User->>UI: Request specific gene-tissue expression
+    UI->>Redux: dispatch(fetchGeneExpression())
+    Redux->>API: Request gene expression data
+    API->>Backend: GET /genes/{gene}/expression/{tissue}
+    Backend->>API: Return gene expression data
+    API->>Redux: Return results
+    Redux->>UI: Update UI with gene expression data
+    UI->>User: Display detailed expression analysis
