@@ -24,10 +24,7 @@ export const ExpressionAnalysis: React.FC = () => {
   , [rawGenes]);
 
   // Skip fetching genes here as GeneSelector will handle it
-  // This prevents duplicate API calls
-  // useEffect(() => {
-  //   dispatch(fetchGenes());
-  // }, [dispatch]);
+  // Let the component-specific logic handle data loading
 
   // Show loading state
   if (genes.loading) {

@@ -53,32 +53,31 @@ const initialState: ExpressionState = {
 // Thunks
 export const fetchGenes = createAsyncThunk(
   'expression/fetchGenes',
-  async (_, { rejectWithValue, getState }) => {
+  async (_, { rejectWithValue }) => {
     try {
       console.log('[REDUX] fetchGenes thunk called');
-      
-      // Get current state to check if we should make this request
-      const state = getState() as { expression?: ExpressionState };
-      const expressionState = state.expression;
-      
-      // Skip if we already have data or are loading
-      if (expressionState?.genes?.options?.length > 0) {
-        console.log('[REDUX] Already have genes data, skipping fetch');
-        return null;
-      }
-      
-      if (expressionState?.genes?.loading) {
-        console.log('[REDUX] Already loading genes, skipping fetch');
-        return null;
-      }
-      
-      // Make the request
-      console.log('[REDUX] Making searchGenes API call');
       const response = await api.searchGenes();
       return response;
     } catch (error: any) {
       console.error('[REDUX] Error fetching genes:', error);
       return rejectWithValue(error.message || 'Failed to fetch genes');
+    }
+  },
+  {
+    // This condition will prevent the action from firing if:
+    // - It's already in progress (loading)
+    // - We already have gene data
+    condition: (_, { getState }) => {
+      const state = getState() as RootState;
+      const { genes } = state.expression;
+      
+      // Don't dispatch if already loading or if we have data
+      if (genes.loading || genes.options.length > 0) {
+        console.log('[REDUX] Condition prevented fetchGenes: already loading or has data');
+        return false;
+      }
+      
+      return true;
     }
   }
 );

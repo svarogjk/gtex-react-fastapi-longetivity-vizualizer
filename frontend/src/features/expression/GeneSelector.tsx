@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo} from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { fetchGenes, setSelectedGene, fetchTissueExpression } from './expressionSlice';
 import { Loading } from '../../components/common/Loading';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
+
+const hasFetchedGenesData = { value: false };
 
 export const GeneSelector: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -19,22 +21,23 @@ export const GeneSelector: React.FC = () => {
   const selectedGene = useMemo(() => 
     rawSelectedGene || ''
   , [rawSelectedGene]);
-
-  // Fetch genes exactly once on mount, using a ref to track it
-  const hasFetchedRef = React.useRef(false);
   
   useEffect(() => {
-    // Only fetch if we don't have data, aren't already loading, and haven't fetched before
-    if (!hasFetchedRef.current && !genes.loading && genes.options.length === 0 && !genes.error) {
-      console.log('[COMPONENT] GeneSelector - fetching genes data');
-      hasFetchedRef.current = true;
+    // If we haven't fetched yet, and there's no loading in progress, and we don't have data
+    if (!hasFetchedGenesData.value && !genes.loading && genes.options.length === 0 && !genes.error) {
+      // Mark as fetched *before* dispatching to prevent race conditions
+      hasFetchedGenesData.value = true;
+      
+      // Now dispatch the action
       dispatch(fetchGenes());
     }
-  }, []); // Empty dependency array - only run on mount
+  }, [dispatch, genes.loading, genes.options.length, genes.error]);
 
   const handleGeneChange = (value: string) => {
     dispatch(setSelectedGene(value));
-    dispatch(fetchTissueExpression(value));
+    if (value) {
+      dispatch(fetchTissueExpression(value));
+    }
   };
 
   return (
@@ -51,6 +54,7 @@ export const GeneSelector: React.FC = () => {
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
               value={selectedGene}
               onChange={(e) => handleGeneChange(e.target.value)}
+              disabled={genes.loading}
             >
               <option value="">Choose a gene...</option>
               {genes.options.map((option) => (
