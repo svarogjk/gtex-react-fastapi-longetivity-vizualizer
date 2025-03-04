@@ -1,50 +1,32 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { setSelectedTissue } from './expressionSlice';
+import { useGetTissueSummaryQuery } from '../../services/api';
 import { Loading } from '../../components/common/Loading';
 
 export const TissueSelector: React.FC = () => {
   const dispatch = useAppDispatch();
+  const selectedGene = useAppSelector(state => state.expression.selectedGene);
+  const selectedTissue = useAppSelector(state => state.expression.selectedTissue);
   
-  // Get raw state values from Redux
-  const rawSelectedGene = useAppSelector(state => state.expression.selectedGene);
-  const rawTissues = useAppSelector(state => state.expression.tissues);
-  const rawSelectedTissue = useAppSelector(state => state.expression.selectedTissue);
-  const rawLoadingTissues = useAppSelector(state => state.expression.loadingTissues);
-  const rawTissueExpression = useAppSelector(state => state.expression.tissueExpression);
-  
-  // Memoize the derived state
-  const selectedGene = useMemo(() => 
-    rawSelectedGene || ''
-  , [rawSelectedGene]);
-  
-  const tissues = useMemo(() => 
-    rawTissues || []
-  , [rawTissues]);
-  
-  const selectedTissue = useMemo(() => 
-    rawSelectedTissue || ''
-  , [rawSelectedTissue]);
-  
-  const loadingTissues = useMemo(() => 
-    rawLoadingTissues || false
-  , [rawLoadingTissues]);
-  
-  const tissueExpression = useMemo(() => 
-    rawTissueExpression || []
-  , [rawTissueExpression]);
+  // Get tissue expression data using RTK Query
+  const { data, isLoading } = useGetTissueSummaryQuery(selectedGene, {
+    skip: !selectedGene
+  });
 
   const handleTissueChange = (value: string) => {
     dispatch(setSelectedTissue(value));
   };
 
   // Don't render if no gene is selected or if there's no expression data
-  if (!selectedGene || tissueExpression.length === 0) {
+  if (!selectedGene || !data || !data.data.tissue_expression || data.data.tissue_expression.length === 0) {
     return null;
   }
 
+  const tissues = data.data.tissue_expression.map(item => item.tissue);
+
   const getTissueDisplayName = (tissue: string): string => {
-    const match = tissueExpression.find(item => item.tissue === tissue);
+    const match = data.data.tissue_expression.find(item => item.tissue === tissue);
     return match?.display_name || tissue.replace(/_/g, ' ');
   };
 
@@ -53,7 +35,7 @@ export const TissueSelector: React.FC = () => {
       <div className="p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Tissue Selection</h2>
         
-        {loadingTissues ? (
+        {isLoading ? (
           <Loading message="Loading tissues..." />
         ) : (
           <div className="space-y-2">
@@ -86,9 +68,9 @@ export const TissueSelector: React.FC = () => {
             {selectedTissue && (
               <div className="mt-2 p-2 bg-gray-50 rounded-md">
                 <p className="text-sm font-medium">Selected: {getTissueDisplayName(selectedTissue)}</p>
-                {tissueExpression.find(t => t.tissue === selectedTissue)?.sample_count && (
+                {data.data.tissue_expression.find(t => t.tissue === selectedTissue)?.sample_count && (
                   <p className="text-xs text-gray-600 mt-1">
-                    Samples: {tissueExpression.find(t => t.tissue === selectedTissue)?.sample_count}
+                    Samples: {data.data.tissue_expression.find(t => t.tissue === selectedTissue)?.sample_count}
                   </p>
                 )}
               </div>

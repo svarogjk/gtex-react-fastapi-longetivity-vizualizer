@@ -1,40 +1,12 @@
-import React, { useEffect, useMemo } from 'react';
+import React from 'react';
 import { GeneSelector } from './GeneSelector';
 import { TissueSelector } from './TissueSelector';
 import { TissueExpressionChart } from './TissueExpressionChart';
-import { useAppSelector, useAppDispatch } from '../../app/hooks';
-import { fetchGenes } from './expressionSlice';
-import { Loading } from '../../components/common/Loading';
-import { ErrorMessage } from '../../components/common/ErrorMessage';
+import { useAppSelector } from '../../app/hooks';
 
 export const ExpressionAnalysis: React.FC = () => {
-  const dispatch = useAppDispatch();
-  
-  // Get raw state values from Redux
-  const rawSelectedGene = useAppSelector(state => state.expression.selectedGene);
-  const rawGenes = useAppSelector(state => state.expression.genes);
-  
-  // Memoize the derived state
-  const selectedGene = useMemo(() => 
-    rawSelectedGene || ''
-  , [rawSelectedGene]);
-  
-  const genes = useMemo(() => 
-    rawGenes || { loading: false, error: null, options: [] }
-  , [rawGenes]);
-
-  // Skip fetching genes here as GeneSelector will handle it
-  // Let the component-specific logic handle data loading
-
-  // Show loading state
-  if (genes.loading) {
-    return <Loading message="Loading gene data..." />;
-  }
-
-  // Show error state
-  if (genes.error) {
-    return <ErrorMessage message={genes.error} />;
-  }
+  // Get selected gene from Redux store
+  const selectedGene = useAppSelector(state => state.expression.selectedGene);
 
   return (
     <div className="space-y-6">

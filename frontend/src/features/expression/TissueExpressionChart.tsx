@@ -1,52 +1,24 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useAppSelector } from '../../app/hooks';
+import { useGetTissueSummaryQuery } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Loading } from '../../components/common/Loading';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 
 export const TissueExpressionChart: React.FC = () => {
-  // Get raw state values from Redux
-  const rawSelectedGene = useAppSelector(state => state.expression.selectedGene);
-  const rawTissueExpression = useAppSelector(state => state.expression.tissueExpression);
-  const rawLoadingTissues = useAppSelector(state => state.expression.loadingTissues);
-  const rawError = useAppSelector(state => state.expression.error);
+  const selectedGene = useAppSelector(state => state.expression.selectedGene);
   
-  // Memoize the derived state
-  const selectedGene = useMemo(() => 
-    rawSelectedGene || ''
-  , [rawSelectedGene]);
-  
-  const tissueExpression = useMemo(() => 
-    rawTissueExpression || []
-  , [rawTissueExpression]);
-  
-  const loadingTissues = useMemo(() => 
-    rawLoadingTissues || false
-  , [rawLoadingTissues]);
-  
-  const error = useMemo(() => 
-    rawError || null
-  , [rawError]);
-  
-  // Prepare data for the chart
-  const sortedData = useMemo(() => {
-    if (!tissueExpression.length) return [];
-    
-    return [...tissueExpression]
-      .sort((a, b) => b.median_expression - a.median_expression)
-      .slice(0, 15) // Show top 15 tissues
-      .map(item => ({
-        ...item,
-        name: item.display_name || item.tissue.replace(/_/g, ' ')
-      }));
-  }, [tissueExpression]);
+  // Using RTK Query hook with skip option to prevent fetching when no gene is selected
+  const { data, isLoading, error } = useGetTissueSummaryQuery(selectedGene, {
+    skip: !selectedGene
+  });
 
   // Don't render anything if no gene is selected
   if (!selectedGene) {
     return null;
   }
 
-  if (loadingTissues) {
+  if (isLoading) {
     return (
       <div className="bg-white shadow rounded-lg">
         <div className="p-6">
@@ -60,13 +32,13 @@ export const TissueExpressionChart: React.FC = () => {
     return (
       <div className="bg-white shadow rounded-lg">
         <div className="p-6">
-          <ErrorMessage message={error} />
+          <ErrorMessage message={error.toString()} />
         </div>
       </div>
     );
   }
 
-  if (tissueExpression.length === 0) {
+  if (!data || !data.data.tissue_expression || data.data.tissue_expression.length === 0) {
     return (
       <div className="bg-white shadow rounded-lg">
         <div className="p-6">
@@ -75,6 +47,15 @@ export const TissueExpressionChart: React.FC = () => {
       </div>
     );
   }
+
+  // Prepare data for the chart
+  const sortedData = [...data.data.tissue_expression]
+    .sort((a, b) => b.median_expression - a.median_expression)
+    .slice(0, 15) // Show top 15 tissues
+    .map(item => ({
+      ...item,
+      name: item.display_name || item.tissue.replace(/_/g, ' ')
+    }));
 
   return (
     <div className="bg-white shadow rounded-lg">
