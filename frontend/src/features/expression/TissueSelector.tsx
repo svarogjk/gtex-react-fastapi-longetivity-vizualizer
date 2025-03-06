@@ -23,11 +23,24 @@ export const TissueSelector: React.FC = () => {
     return null;
   }
 
-  const tissues = data.data.tissue_expression.map(item => item.tissue);
+  // Create a deduplicated list of tissues to prevent the duplicate key issue
+  const tissueMap = new Map();
+  data.data.tissue_expression.forEach(item => {
+    // Only add the tissue if it hasn't been added yet
+    if (!tissueMap.has(item.tissue)) {
+      tissueMap.set(item.tissue, {
+        id: item.tissue,
+        displayName: item.display_name || item.tissue.replace(/_/g, ' '),
+        sampleCount: item.sample_count
+      });
+    }
+  });
+  
+  // Convert the Map to an array for rendering
+  const uniqueTissues = Array.from(tissueMap.values());
 
   const getTissueDisplayName = (tissue: string): string => {
-    const match = data.data.tissue_expression.find(item => item.tissue === tissue);
-    return match?.display_name || tissue.replace(/_/g, ' ');
+    return tissueMap.get(tissue)?.displayName || tissue.replace(/_/g, ' ');
   };
 
   return (
@@ -44,33 +57,33 @@ export const TissueSelector: React.FC = () => {
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
               value={selectedTissue}
               onChange={(e) => handleTissueChange(e.target.value)}
-              disabled={tissues.length === 0}
+              disabled={uniqueTissues.length === 0}
             >
               <option value="">
-                {tissues.length === 0 
+                {uniqueTissues.length === 0 
                   ? "No tissues available" 
                   : "Choose a tissue..."}
               </option>
-              {tissues.map((tissue) => (
+              {uniqueTissues.map((tissue) => (
                 <option
-                  key={tissue}
-                  value={tissue}
+                  key={`tissue-${tissue.id}`} // Add a prefix to ensure uniqueness
+                  value={tissue.id}
                 >
-                  {getTissueDisplayName(tissue)}
+                  {tissue.displayName}
                 </option>
               ))}
             </select>
             
-            {tissues.length === 0 && (
+            {uniqueTissues.length === 0 && (
               <p className="text-sm text-gray-500">No tissues available for this gene</p>
             )}
             
             {selectedTissue && (
               <div className="mt-2 p-2 bg-gray-50 rounded-md">
                 <p className="text-sm font-medium">Selected: {getTissueDisplayName(selectedTissue)}</p>
-                {data.data.tissue_expression.find(t => t.tissue === selectedTissue)?.sample_count && (
+                {tissueMap.get(selectedTissue)?.sampleCount > 0 && (
                   <p className="text-xs text-gray-600 mt-1">
-                    Samples: {data.data.tissue_expression.find(t => t.tissue === selectedTissue)?.sample_count}
+                    Samples: {tissueMap.get(selectedTissue).sampleCount}
                   </p>
                 )}
               </div>

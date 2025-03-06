@@ -117,7 +117,7 @@ export const api = createApi({
     }),
     
     getTissueSummary: builder.query<TissueExpressionResponse, string>({
-      query: (gene) => `genes/${gene}/tissue-summary`,
+      query: (gene) => `expression/genes/${gene}/tissue-summary`,
       providesTags: (result, error, gene) => [{ type: 'Gene', id: gene }]
     }),
     
