@@ -95,24 +95,44 @@ interface LongevityAnalysisResponse {
 // Define the API service
 export const api = createApi({
   reducerPath: 'api',
-  baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
+  baseQuery: fetchBaseQuery({ 
+    baseUrl: 'http://localhost:8000/api',
+    // Add headers for content type and request identification
+    prepareHeaders: (headers) => {
+      headers.set('Content-Type', 'application/json');
+      return headers;
+    }
+  }),
   endpoints: (builder) => ({
     // Gene-related endpoints
     searchGenes: builder.query<GenesResponse, void>({
-      query: () => 'dropdown/genes',
+      query: () => 'dropdown_routes/dropdown/genes',
+      // Transform the response if needed
+      transformResponse: (response: GenesResponse) => {
+        console.log('Raw search genes response:', response);
+        return response;
+      },
+      // Provide some tags for caching
+      providesTags: ['Genes']
     }),
     
     getTissueSummary: builder.query<TissueExpressionResponse, string>({
       query: (gene) => `genes/${gene}/tissue-summary`,
+      providesTags: (result, error, gene) => [{ type: 'Gene', id: gene }]
     }),
     
     getGeneTissueExpression: builder.query<ExpressionDataResponse, { gene: string; tissue: string }>({
       query: ({ gene, tissue }) => `genes/${gene}/expression/${tissue}`,
+      providesTags: (result, error, arg) => [
+        { type: 'Gene', id: arg.gene },
+        { type: 'Tissue', id: arg.tissue }
+      ]
     }),
     
     // Tissue-related endpoints
     getTissues: builder.query<TissuesResponse, void>({
       query: () => 'tissues',
+      providesTags: ['Tissues']
     }),
     
     // Dataset-related endpoints
@@ -121,19 +141,23 @@ export const api = createApi({
         url: 'dropdown/datasets',
         params: genes ? { genes } : undefined,
       }),
+      providesTags: ['Datasets']
     }),
     
     getDatasetMetadata: builder.query<DatasetMetadataResponse, string>({
       query: (datasetId) => `datasets/${datasetId}/metadata`,
+      providesTags: (result, error, datasetId) => [{ type: 'Dataset', id: datasetId }]
     }),
     
     getDatasetDetails: builder.query<DatasetDetailsResponse, string>({
       query: (datasetId) => `datasets/${datasetId}/details`,
+      providesTags: (result, error, datasetId) => [{ type: 'Dataset', id: datasetId }]
     }),
     
     // Dropdown options
     getDropdownOptions: builder.query<Record<string, any>, void>({
       query: () => 'dropdown/options',
+      providesTags: ['Dropdowns']
     }),
     
     // Analysis endpoints
@@ -142,6 +166,10 @@ export const api = createApi({
         url: 'genes/expression',
         params: { genes, tissue },
       }),
+      providesTags: (result, error, arg) => [
+        ...arg.genes.map(gene => ({ type: 'Gene' as const, id: gene })),
+        { type: 'Tissue' as const, id: arg.tissue }
+      ]
     }),
     
     analyzeLongevity: builder.query<LongevityAnalysisResponse, { genes: string[]; tissue: string }>({
@@ -149,9 +177,14 @@ export const api = createApi({
         url: 'genes/longevity-analysis',
         params: { genes, tissue },
       }),
+      providesTags: (result, error, arg) => [
+        ...arg.genes.map(gene => ({ type: 'Gene' as const, id: gene })),
+        { type: 'Tissue' as const, id: arg.tissue }
+      ]
     }),
   }),
 });
+
 
 // Export hooks for each endpoint
 export const {

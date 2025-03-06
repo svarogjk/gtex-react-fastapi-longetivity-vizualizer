@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { setSelectedGene } from './expressionSlice';
 import { useSearchGenesQuery } from '../../services/api';
@@ -9,34 +9,65 @@ export const GeneSelector: React.FC = () => {
   const dispatch = useAppDispatch();
   const selectedGene = useAppSelector(state => state.expression.selectedGene);
   
-  // Using RTK Query hook instead of dispatching actions manually
-  const { data, isLoading, error } = useSearchGenesQuery();
+  // Using RTK Query hook
+  const { data, isLoading, error, refetch } = useSearchGenesQuery();
   
-  // Debug logging
-  console.log("Gene data received:", data);
+  useEffect(() => {
+    // Log detailed information about the current state
+    console.log("Gene selector state:", {
+      isLoading,
+      hasData: !!data,
+      dataStructure: data ? Object.keys(data) : 'undefined',
+      error: error ? (error as any).message || String(error) : null
+    });
+  }, [data, isLoading, error]);
   
   const handleGeneChange = (value: string) => {
     dispatch(setSelectedGene(value));
   };
 
-  // Check the structure before rendering
+  const handleRetry = () => {
+    refetch();
+  };
+
+  // Process the data for use in the dropdown
   const geneOptions = React.useMemo(() => {
-    if (!data?.genes) return [];
+    if (!data) return [];
     
-    console.log("Gene structure:", data.genes[0]); // Log the first item to see its structure
+    // Check if data.genes is an array
+    if (Array.isArray(data.genes)) {
+      return data.genes.map(gene => {
+        if (typeof gene === 'string') {
+          return { value: gene, label: gene };
+        } else if (typeof gene === 'object' && gene !== null) {
+          // For object structure (if the API returns gene objects)
+          return { 
+            value: gene.value || gene.id || gene.symbol || JSON.stringify(gene),
+            label: gene.label || gene.name || gene.symbol || JSON.stringify(gene)
+          };
+        }
+        return { value: 'unknown', label: 'Unknown Gene' };
+      });
+    }
     
-    // Handle both array of strings and array of objects
-    return data.genes.map(gene => {
-      if (typeof gene === 'string') {
-        return { value: gene, label: gene };
-      } else if (typeof gene === 'object' && gene !== null) {
-        return { 
-          value: gene.value || gene.id || gene.symbol || JSON.stringify(gene),
-          label: gene.label || gene.name || gene.symbol || JSON.stringify(gene)
-        };
+    // If data.genes is not an array, check other potential structures
+    if (data.options && Array.isArray(data.options)) {
+      return data.options;
+    }
+    
+    // Last resort - try to convert the whole data object to options
+    try {
+      if (typeof data === 'object') {
+        return Object.entries(data).map(([key, value]) => ({
+          value: key,
+          label: typeof value === 'string' ? value : key
+        }));
       }
-      return { value: 'unknown', label: 'Unknown Gene' };
-    });
+    } catch (e) {
+      console.error("Failed to process gene data:", e);
+    }
+    
+    return [];
   }, [data]);
 
   return (
@@ -47,7 +78,19 @@ export const GeneSelector: React.FC = () => {
         {isLoading ? (
           <Loading message="Loading genes..." />
         ) : error ? (
-          <ErrorMessage message={error.toString()} />
+          <div>
+            <ErrorMessage message={
+              typeof error === 'string' 
+                ? error 
+                : (error as any)?.message || 'An error occurred fetching genes'
+            } />
+            <button 
+              onClick={handleRetry}
+              className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Retry
+            </button>
+          </div>
         ) : (
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">Select Gene</label>
@@ -55,7 +98,7 @@ export const GeneSelector: React.FC = () => {
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
               value={selectedGene}
               onChange={(e) => handleGeneChange(e.target.value)}
-              disabled={isLoading}
+              disabled={isLoading || geneOptions.length === 0}
             >
               <option value="">Choose a gene...</option>
               {geneOptions.map((option) => (
@@ -68,19 +111,23 @@ export const GeneSelector: React.FC = () => {
               ))}
             </select>
             
-            {/* Show the current selected value for debugging */}
-            <div className="text-xs text-gray-500">
-              Selected value: {JSON.stringify(selectedGene)}
-            </div>
+            {/* Debug information */}
+            <details className="mt-2 text-xs text-gray-500">
+              <summary>Debug Info</summary>
+              <div className="p-2 bg-gray-50 mt-1 rounded">
+                <p>Selected: {JSON.stringify(selectedGene)}</p>
+                <p>Options count: {geneOptions.length}</p>
+                <p>Data available: {data ? 'Yes' : 'No'}</p>
+                {data && <p>Data keys: {Object.keys(data).join(', ')}</p>}
+              </div>
+            </details>
             
-            {selectedGene && data?.gene_details && (
+            {selectedGene && data?.gene_details && data.gene_details[selectedGene] && (
               <div className="mt-2 p-2 bg-gray-50 rounded-md">
                 <p className="text-sm font-medium">Selected: {selectedGene}</p>
-                {data.gene_details[selectedGene]?.description && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    {data.gene_details[selectedGene].description}
-                  </p>
-                )}
+                <p className="text-xs text-gray-600 mt-1">
+                  {data.gene_details[selectedGene].description}
+                </p>
               </div>
             )}
           </div>
