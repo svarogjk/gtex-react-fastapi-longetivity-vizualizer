@@ -323,7 +323,7 @@ class ExpressionEndpoints:
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 # Updated endpoint for tissue expression with correct parameter name
-                url = f"{self.base_url}/expression/medianTranscriptExpression"
+                url = f"{self.base_url}/expression/medianGeneExpression"
                 params = {
                     "datasetId": "gtex_v8",
                     "gencodeId": gencode_id,  # Changed from geneId to gencodeId
