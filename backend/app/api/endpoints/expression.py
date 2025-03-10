@@ -308,7 +308,7 @@ class ExpressionEndpoints:
         return "Other"
 
     @cache.memoize(timeout=3600)
-    async def get_tissue_expression_summary(self, gene: str) -> Dict:
+    async def get_tissue_expression_summary_by_gene(self, gene: str) -> Dict:
         """Get expression summary across tissues for a gene"""
         try:
             gencode_id = await self.get_gencode_id(gene)
@@ -395,6 +395,143 @@ class ExpressionEndpoints:
                 "status": "error",
                 "message": str(e),
                 "data": {"gene": gene, "tissue_expression": []},
+            }
+
+    async def get_dataset_expression_summary_by_gene_tissue(
+        self, gene: str, tissue: str
+    ) -> Dict:
+        """
+        Get comprehensive expression summary for a gene in a specific tissue.
+
+        Parameters:
+        gene (str): Gene symbol to analyze
+        tissue (str): Tissue to analyze expression in
+
+        Returns:
+        Dict: Dictionary containing expression data, statistics, and metadata
+        """
+        try:
+            # Get gencode ID for the gene
+            gencode_id = await self.get_gencode_id(gene)
+            if not gencode_id:
+                return {
+                    "status": "error",
+                    "message": f"Gene {gene} not found in GTEx database",
+                    "data": {"gene": gene, "tissue": tissue, "expression": {}},
+                }
+
+            # Get expression data for the gene in the specified tissue
+            df_expr, df_meta = await self.get_expression_data([gene], tissue)
+
+            if df_expr.empty or df_meta.empty:
+                return {
+                    "status": "error",
+                    "message": f"No expression data available for {gene} in {tissue}",
+                    "data": {"gene": gene, "tissue": tissue, "expression": {}},
+                }
+
+            # Extract tissue display name
+            tissue_display = self.valid_tissues.get(tissue, tissue)
+
+            # Calculate expression statistics
+            expression_values = (
+                df_expr[gene].tolist() if gene in df_expr.columns else []
+            )
+
+            statistics = {
+                "mean": float(df_expr[gene].mean()) if expression_values else 0,
+                "median": float(df_expr[gene].median()) if expression_values else 0,
+                "std": float(df_expr[gene].std()) if expression_values else 0,
+                "min": float(df_expr[gene].min()) if expression_values else 0,
+                "max": float(df_expr[gene].max()) if expression_values else 0,
+                "quartiles": (
+                    [
+                        float(df_expr[gene].quantile(0.25)),
+                        float(df_expr[gene].quantile(0.5)),
+                        float(df_expr[gene].quantile(0.75)),
+                    ]
+                    if expression_values
+                    else [0, 0, 0]
+                ),
+                "sample_count": len(expression_values),
+            }
+
+            # Additional tissue context data - compare with tissue expression summary
+            tissue_context = await self.get_tissue_expression_summary_by_gene(gene)
+            tissue_rank = None
+            percentile = None
+
+            if tissue_context["status"] == "success":
+                tissue_data = tissue_context["data"]["tissue_expression"]
+                all_expressions = [t["median_expression"] for t in tissue_data]
+
+                if all_expressions:
+                    # Find the current tissue in the list
+                    current_tissue_data = next(
+                        (t for t in tissue_data if t["tissue"] == tissue), None
+                    )
+
+                    if current_tissue_data:
+                        current_expression = current_tissue_data["median_expression"]
+                        tissue_rank = sum(
+                            1 for x in all_expressions if x >= current_expression
+                        )
+                        percentile = round(
+                            (len(all_expressions) - tissue_rank)
+                            / len(all_expressions)
+                            * 100,
+                            2,
+                        )
+
+            return {
+                "status": "success",
+                "data": {
+                    "gene": gene,
+                    "gencode_id": gencode_id,
+                    "tissue": tissue,
+                    "tissue_display_name": tissue_display,
+                    "expression_values": expression_values,
+                    "statistics": statistics,
+                    "metadata": {
+                        "unit": (
+                            df_meta["unit"].iloc[0]
+                            if "unit" in df_meta.columns
+                            else "TPM"
+                        ),
+                        "dataset_id": (
+                            df_meta["dataset_id"].iloc[0]
+                            if "dataset_id" in df_meta.columns
+                            else self.dataset
+                        ),
+                    },
+                    "tissue_context": {
+                        "rank": tissue_rank,
+                        "percentile": percentile,
+                        "total_tissues": (
+                            len(tissue_context["data"]["tissue_expression"])
+                            if tissue_context["status"] == "success"
+                            else None
+                        ),
+                        "highest_expression_tissue": (
+                            tissue_context["data"]["tissue_expression"][0][
+                                "display_name"
+                            ]
+                            if tissue_context["status"] == "success"
+                            and tissue_context["data"]["tissue_expression"]
+                            else None
+                        ),
+                    },
+                },
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error getting expression summary for {gene} in {tissue}: {str(e)}"
+            )
+            return {
+                "status": "error",
+                "message": str(e),
+                "data": {"gene": gene, "tissue": tissue, "expression": {}},
             }
 
     async def get_gencode_id(self, gene_symbol: str) -> Optional[str]:

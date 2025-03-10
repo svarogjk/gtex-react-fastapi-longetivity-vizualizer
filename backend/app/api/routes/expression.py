@@ -112,7 +112,7 @@ async def get_tissue_summary(gene: str):
                 status_code=400, detail=f"Invalid gene symbol format: {gene}"
             )
 
-        result = await expression_endpoints.get_tissue_expression_summary(gene)
+        result = await expression_endpoints.get_tissue_expression_summary_by_gene(gene)
 
         # Handle different error cases
         if result["status"] == "error":
@@ -133,6 +133,137 @@ async def get_tissue_summary(gene: str):
         logger.error(f"Error getting tissue summary: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Internal server error processing gene {gene}"
+        )
+
+
+@router.get("/datasets-summary/genes/{gene}/tissues/{tissue}")
+async def get_dataset_expression_summaries(
+    gene: str,
+    tissue: str,
+    limit: Optional[int] = Query(
+        50, description="Limit the number of datasets returned"
+    ),
+):
+    """
+    Get expression summaries across multiple datasets for a specific gene and tissue.
+
+    Returns median expression values and dataset metadata for the gene in the specified tissue.
+    """
+    try:
+        # Validate gene symbol
+        if not validate_genes([gene]):
+            raise HTTPException(status_code=400, detail=f"Invalid gene symbol: {gene}")
+
+        # Handle case sensitivity for tissue
+        tissue_upper = tissue.upper()
+        normalized_tissue = None
+
+        # Check if it's a valid tissue key or display name
+        for tissue_key, display_name in expression_endpoints.valid_tissues.items():
+            if (
+                tissue_upper == tissue_key.upper()
+                or tissue.lower() == display_name.lower()
+            ):
+                normalized_tissue = tissue_key
+                break
+
+        if not normalized_tissue:
+            # Get all available tissues for better error message
+            tissues_info = await expression_endpoints.get_available_tissues()
+            available_tissues = tissues_info.get("tissues", [])
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid tissue type: {tissue}. Available tissues include: {', '.join(available_tissues[:5])}...",
+            )
+
+        # Get the detailed expression summary for this gene-tissue combination
+        result = (
+            await expression_endpoints.get_dataset_expression_summary_by_gene_tissue(
+                gene, normalized_tissue
+            )
+        )
+
+        if result["status"] == "error":
+            if "not found" in result["message"].lower():
+                raise HTTPException(
+                    status_code=404, detail=f"Gene {gene} not found in GTEx database"
+                )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error processing gene {gene} in tissue {normalized_tissue}: {result['message']}",
+            )
+
+        # Get related datasets with expression data for this gene-tissue combination
+        related_datasets = []
+
+        # First, try to get GTEx dataset information
+        gtex_dataset = {
+            "dataset_id": result["data"]["metadata"]["dataset_id"],
+            "dataset_name": "GTEx v8",
+            "dataset_type": "GTEx",
+            "median_expression": result["data"]["statistics"]["median"],
+            "mean_expression": result["data"]["statistics"]["mean"],
+            "unit": result["data"]["metadata"]["unit"],
+            "sample_count": result["data"]["statistics"]["sample_count"],
+            "source": "GTEx",
+        }
+        related_datasets.append(gtex_dataset)
+
+        # Try to get additional datasets from GEO with this gene-tissue combination
+        try:
+            # Query the search service for related datasets
+            additional_datasets = await search_service.find_datasets_for_gene_tissue(
+                gene, normalized_tissue, limit - 1
+            )
+
+            if additional_datasets and "datasets" in additional_datasets:
+                for dataset in additional_datasets["datasets"]:
+                    # If we have expression data for this dataset, add it
+                    if "median_expression" in dataset:
+                        related_datasets.append(
+                            {
+                                "dataset_id": dataset["dataset_id"],
+                                "dataset_name": dataset.get(
+                                    "title", dataset.get("name", "Unknown")
+                                ),
+                                "dataset_type": dataset.get("type", "Unknown"),
+                                "median_expression": dataset["median_expression"],
+                                "mean_expression": dataset.get("mean_expression", None),
+                                "unit": dataset.get("unit", "Unknown"),
+                                "sample_count": dataset.get("sample_count", 0),
+                                "source": dataset.get("source", "GEO"),
+                            }
+                        )
+        except Exception as e:
+            logger.warning(
+                f"Error retrieving additional datasets for {gene} in {normalized_tissue}: {str(e)}"
+            )
+            # Continue with just the GTEx data if there's an error with additional datasets
+
+        # Return the consolidated result
+        return {
+            "status": "success",
+            "data": {
+                "gene": gene,
+                "tissue": normalized_tissue,
+                "original_tissue_query": tissue,
+                "tissue_display_name": result["data"]["tissue_display_name"],
+                "gtex_summary": {
+                    "statistics": result["data"]["statistics"],
+                    "tissue_context": result["data"]["tissue_context"],
+                },
+                "datasets": related_datasets[:limit],
+            },
+        }
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error getting dataset expression summaries: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error processing gene {gene} in tissue {tissue}",
         )
 
 
