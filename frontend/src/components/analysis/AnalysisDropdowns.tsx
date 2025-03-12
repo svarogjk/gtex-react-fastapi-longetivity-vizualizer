@@ -9,6 +9,7 @@ import {
 import { 
   useGetDropdownOptionsQuery,
   useGetTissuesQuery,
+  useGetDatasetsSummaryQuery,
   useGetDatasetMetadataQuery
 } from '../../services/api';
 import { ErrorMessage } from '../common/ErrorMessage';
@@ -27,6 +28,11 @@ export const AnalysisDropdowns: React.FC = () => {
   // Fetch tissues when gene is selected
   const { data: tissuesData, isLoading: isLoadingTissues } = useGetTissuesQuery(undefined, {
     skip: !selectedGene
+  });
+
+   // Fetch datasets when tissue is selected
+   const { data: datasetsData, isLoading: isLoadingDatasets } = useGetDatasetsSummaryQuery(undefined, {
+    skip: !selectedTissue
   });
   
   // Fetch dataset metadata when dataset is selected
@@ -126,6 +132,38 @@ export const AnalysisDropdowns: React.FC = () => {
             </select>
             {selectedGene && !isLoadingTissues && (!tissuesData?.tissues || tissuesData.tissues.length === 0) && (
               <p className="text-sm text-gray-500">No tissues available for this gene</p>
+            )}
+          </div>
+
+          {/* Dataset Selection */}
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">3. Select Dataset</label>
+            <select
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+              value={selectedDataset}
+              onChange={(e) => handleDatasetChange(e.target.value)}
+              disabled={!selectedTissue || isLoadingDatasets || !datasetsData?.datasets.length}
+            >
+              <option value="">
+                {!selectedTissue 
+                  ? "Select a tissue first" 
+                  : isLoadingDatasets
+                    ? "Loading datasets..."
+                    : !datasetsData?.datasets.length
+                      ? "No tissues available" 
+                      : "Choose a tissue..."}
+              </option>
+              {datasetsData?.datasets?.map((dataset: string) => (
+                <option
+                  key={dataset}
+                  value={dataset}
+                >
+                  {dataset.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
+            {selectedDataset && !isLoadingDatasets && (!datasetsData?.datasets || datasetsData.datasets.length === 0) && (
+              <p className="text-sm text-gray-500">No datasets available for this tissue</p>
             )}
           </div>
         </div>

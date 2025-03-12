@@ -58,6 +58,18 @@ interface TissuesResponse {
   categories: Record<string, Array<{ id: string; name: string }>>;
 }
 
+interface DatasetSummary {
+  dataset_id: string;
+  dataset_name: string;
+  dataset_type: string;
+  median_expression: number;
+  mean_expression: number;
+  unit: string;
+  sample_count: number;
+  source: string;
+  tissue: string;
+}
+
 interface ExpressionDataResponse {
   status: string;
   message: string;
@@ -136,10 +148,10 @@ export const api = createApi({
     }),
     
     // Dataset-related endpoints
-    searchDatasets: builder.query<Record<string, any>, string[] | void>({
-      query: (genes) => ({
-        url: 'dropdown/datasets',
-        params: genes ? { genes } : undefined,
+    getDatasetsSummary: builder.query<Record<string, any>, { gene: string; tissue: string }>({
+      query: ({ gene, tissue }) => ({
+        url: `/api/expression/datasets-summary/genes/${gene}/tissues/${tissue}`,
+        params: { limit: 50 }
       }),
       providesTags: ['Datasets']
     }),
@@ -192,7 +204,7 @@ export const {
   useGetTissueSummaryQuery,
   useGetGeneTissueExpressionQuery,
   useGetTissuesQuery,
-  useSearchDatasetsQuery,
+  useGetDatasetsSummaryQuery,
   useGetDatasetMetadataQuery,
   useGetDatasetDetailsQuery,
   useGetDropdownOptionsQuery,
@@ -214,6 +226,12 @@ export default {
     return response.json();
   },
   
+  getDatasetSummary: async (gene: string, tissue: string): Promise<DatasetSummary> => {
+    const response = await fetch(`/api/expression/datasets-summary/genes/${gene}/tissues/${tissue}`);
+    if (!response.ok) throw new Error(`Failed to fetch dataset summary for ${gene} in ${tissue}`);
+    return response.json();
+  },
+
   getDatasetMetadata: async (datasetId: string): Promise<DatasetMetadataResponse> => {
     const response = await fetch(`/api/datasets/${datasetId}/metadata`);
     if (!response.ok) throw new Error(`Failed to fetch metadata for dataset ${datasetId}`);
