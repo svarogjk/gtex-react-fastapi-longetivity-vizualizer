@@ -33,7 +33,7 @@ def validate_tissue(tissue: str) -> bool:
         return False
 
     # Basic tissue pattern: uppercase letters, numbers, and underscores
-    tissue_pattern = re.compile(r"^[A-Z][A-Z0-9_]*$")
+    tissue_pattern = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
     return bool(tissue_pattern.match(tissue.strip()))
 
 

@@ -28,6 +28,30 @@ class ExpressionEndpoints:
             "follow_redirects": True,
         }
 
+        # Define longevity-related genes and pathways
+        self.longevity_genes = {
+            "SIRT1",
+            "SIRT2",
+            "SIRT3",
+            "SIRT4",
+            "SIRT5",
+            "SIRT6",
+            "SIRT7",
+            "FOXO1",
+            "FOXO3",
+            "FOXO4",
+            "CDKN2A",
+            "CDKN2B",
+            "TERT",
+            "APOE",
+            "IGF1",
+            "IGF1R",
+            "MTOR",
+            "AMPK",
+            "PGC1A",
+            "KLOTHO",
+        }
+
         # Add valid tissues map
         self.valid_tissues = {
             "Adipose_Subcutaneous": "Subcutaneous Adipose",
