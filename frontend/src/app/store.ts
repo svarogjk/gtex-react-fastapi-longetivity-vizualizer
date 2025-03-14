@@ -1,12 +1,10 @@
 import { configureStore } from '@reduxjs/toolkit';
 import expressionReducer from '../features/expression/expressionSlice';
-import analysisReducer from '../features/analysis/analysisSlice';
 import { api } from '../services/api';
 
 export const store = configureStore({
     reducer: {
         expression: expressionReducer,
-        analysis: analysisReducer,
         [api.reducerPath]: api.reducer,
     },
     middleware: (getDefaultMiddleware) =>

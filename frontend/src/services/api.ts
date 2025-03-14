@@ -150,7 +150,7 @@ export const api = createApi({
     // Dataset-related endpoints
     getDatasetsSummary: builder.query<Record<string, any>, { gene: string; tissue: string }>({
       query: ({ gene, tissue }) => ({
-        url: `/api/expression/datasets-summary/genes/${gene}/tissues/${tissue}`,
+        url: `/expression/datasets-summary/genes/${gene}/tissues/${tissue}`,
         params: { limit: 50 }
       }),
       providesTags: ['Datasets']

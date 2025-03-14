@@ -1,12 +1,15 @@
 import React from 'react';
 import { GeneSelector } from './GeneSelector';
 import { TissueSelector } from './TissueSelector';
+import { DatasetSelector } from './DatasetSelector'; 
 import { TissueExpressionChart } from './TissueExpressionChart';
 import { useAppSelector } from '../../app/hooks';
 
 export const ExpressionAnalysis: React.FC = () => {
   // Get selected gene from Redux store
   const selectedGene = useAppSelector(state => state.expression.selectedGene);
+  const selectedTissue = useAppSelector(state => state.expression.selectedTissue);
+  const selectedDataset = useAppSelector(state => state.expression.selectedDataset);
 
   return (
     <div className="space-y-6">
@@ -19,6 +22,10 @@ export const ExpressionAnalysis: React.FC = () => {
           <>
             <TissueExpressionChart />
             <TissueSelector />
+
+            {selectedTissue && (
+              <DatasetSelector />
+            )}
           </>
         )}
       </div>
