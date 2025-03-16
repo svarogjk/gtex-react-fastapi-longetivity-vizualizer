@@ -213,8 +213,8 @@ async def get_dataset_expression_summaries(
         # Try to get additional datasets from GEO with this gene-tissue combination
         try:
             # Query the search service for related datasets
-            additional_datasets = await search_service.find_datasets_for_gene_tissue(
-                gene, normalized_tissue, limit - 1
+            additional_datasets = await search_service.search_datasets(
+                genes=[gene], tissues=[normalized_tissue]
             )
 
             if additional_datasets and "datasets" in additional_datasets:

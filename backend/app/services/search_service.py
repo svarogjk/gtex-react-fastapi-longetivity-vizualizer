@@ -139,7 +139,9 @@ class SearchService:
             return {"genes": [], "gene_details": {}, "total_count": 0}
 
     @cache.memoize(timeout=3600)
-    async def search_datasets(self, genes: Optional[List[str]] = None) -> Dict:
+    async def search_datasets(
+        self, genes: list[str] | None = None, tissues: list[str] | None = None
+    ) -> Dict:
         """
         Search for relevant datasets in GEO based on genes and longevity keywords
         """
@@ -148,6 +150,8 @@ class SearchService:
             search_terms = []
             if genes:
                 search_terms.extend(genes)
+            if tissues:
+                search_terms.extend(tissues)
             search_terms.extend(self.longevity_keywords)
             search_terms.extend(self.longevity_pathways)
 
