@@ -642,80 +642,47 @@ class ExpressionEndpoints:
 
     @cache.memoize(timeout=3600)
     async def get_dataset_metadata(self, dataset_id: str) -> Dict:
-        """Get metadata columns with their properties"""
+        """Get sample metadata from GTEx API"""
         try:
-            # If it's a valid tissue, use get_expression_data
-            if dataset_id.upper() in self.valid_tissues:
-                df_expr, df_meta = await self.get_expression_data(["SIRT1"], dataset_id)
-
-                if df_meta.empty:
-                    return {
-                        "status": "error",
-                        "message": f"No metadata available for tissue {dataset_id}",
-                        "columns": [],
-                    }
-
-                columns = []
-                for column in df_meta.columns:
-                    if column != "sample_id":
-                        unique_values = df_meta[column].nunique()
-                        column_type = str(df_meta[column].dtype)
-
-                        columns.append(
-                            {
-                                "name": column,
-                                "unique_values": unique_values,
-                                "type": column_type,
-                            }
-                        )
-
-                return {"status": "success", "columns": columns}
-
-            # Otherwise assume it's a GEO dataset ID
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-                params = {"db": "gds", "id": dataset_id, "retmode": "json"}
+                # Query for actual sample metadata
+                url = f"{self.base_url}/dataset/sample"
+                params = {"datasetId": dataset_id}
 
-                response = await client.get(url, params=params)
+                response = await client.get(url, params=params, headers=self.headers)
+
                 if response.status_code != 200:
-                    return {
-                        "status": "error",
-                        "message": f"Failed to fetch GEO dataset {dataset_id}",
-                        "columns": [],
-                    }
+                    logger.error(
+                        f"Failed to fetch GTEx sample metadata: {response.status_code}"
+                    )
+                    return []
 
                 data = response.json()
-                result = data.get("result", {}).get(str(dataset_id))
 
-                if not result:
-                    return {
-                        "status": "error",
-                        "message": f"Dataset {dataset_id} not found",
-                        "columns": [],
-                    }
-
-                # Extract columns from dataset variables
-                variables = result.get("variables", [])
-                columns = []
-
-                for var in variables:
-                    columns.append(
+                # Process the actual sample data from the GTEx API
+                # Convert to standardized format for your application
+                samples = []
+                for sample in data.get("data", []):
+                    # Map the actual GTEx fields to your required fields
+                    samples.append(
                         {
-                            "name": var.get("name", ""),
-                            "unique_values": len(var.get("categories", [])),
-                            "type": (
-                                "categorical"
-                                if var.get("type") == "factor"
-                                else "numerical"
-                            ),
+                            "sample_id": sample.get("sampleId"),
+                            "subject_id": sample.get("donorId"),
+                            "age": sample.get("age"),
+                            "sex": sample.get("sex"),
+                            # Other fields as available in the API response
                         }
                     )
 
-                return {"status": "success", "columns": columns}
+                return {
+                    "status": "success",
+                    "message": "Metadata retrieved successfully",
+                    "data": {"samples": samples},
+                }
 
         except Exception as e:
-            logger.error(f"Error getting dataset metadata: {str(e)}")
-            return {"status": "error", "message": str(e), "columns": []}
+            logger.error(f"Error retrieving GTEx sample metadata: {str(e)}")
+            return []
 
 
 expression_endpoints = ExpressionEndpoints()
