@@ -339,11 +339,7 @@ class ExpressionEndpoints:
             logger.info(f"Gencode ID lookup for {gene}: {gencode_id}")
 
             if not gencode_id:
-                return {
-                    "status": "error",
-                    "message": f"Gene {gene} not found in GTEx database",
-                    "data": {"gene": gene, "tissue_expression": []},
-                }
+                return {"gene": gene, "tissue_expression": []}
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 # Updated endpoint for tissue expression with correct parameter name
@@ -361,21 +357,13 @@ class ExpressionEndpoints:
                     logger.error(
                         f"GTEx API error: {response.status_code} - {response.text}"
                     )
-                    return {
-                        "status": "error",
-                        "message": "Failed to retrieve expression data",
-                        "data": {"gene": gene, "tissue_expression": []},
-                    }
+                    return {"gene": gene, "tissue_expression": []}
 
                 data = response.json()
 
                 if not data or "data" not in data:
                     logger.error(f"Unexpected GTEx API response: {data}")
-                    return {
-                        "status": "error",
-                        "message": "Invalid response from GTEx API",
-                        "data": {"gene": gene, "tissue_expression": []},
-                    }
+                    return {"gene": gene, "tissue_expression": []}
 
                 tissue_expression = []
                 for tissue_data in data["data"]:
@@ -394,32 +382,21 @@ class ExpressionEndpoints:
                         )
 
                 if not tissue_expression:
-                    return {
-                        "status": "error",
-                        "message": "No tissue expression data found",
-                        "data": {"gene": gene, "tissue_expression": []},
-                    }
+                    return {"gene": gene, "tissue_expression": []}
 
                 return {
-                    "status": "success",
-                    "data": {
-                        "gene": gene,
-                        "gencode_id": gencode_id,
-                        "tissue_expression": sorted(
-                            tissue_expression,
-                            key=lambda x: x["median_expression"],
-                            reverse=True,
-                        ),
-                    },
+                    "gene": gene,
+                    "gencode_id": gencode_id,
+                    "tissue_expression": sorted(
+                        tissue_expression,
+                        key=lambda x: x["median_expression"],
+                        reverse=True,
+                    ),
                 }
 
         except Exception as e:
             logger.error(f"Error in tissue expression summary: {str(e)}")
-            return {
-                "status": "error",
-                "message": str(e),
-                "data": {"gene": gene, "tissue_expression": []},
-            }
+            return {"gene": gene, "tissue_expression": []}
 
     async def get_dataset_expression_summary_by_gene_tissue(
         self, gene: str, tissue: str
@@ -642,47 +619,36 @@ class ExpressionEndpoints:
 
     @cache.memoize(timeout=3600)
     async def get_dataset_metadata(self, dataset_id: str) -> Dict:
-        """Get sample metadata from GTEx API"""
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                # Query for actual sample metadata
-                url = f"{self.base_url}/dataset/sample"
-                params = {"datasetId": dataset_id}
+        """
+        Get sample metadata from GTEx API using available endpoints.
+        This function is designed to be robust against API changes.
+        """
+        metadata_samples = []
+        # Extract GTEx version from dataset_id
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            # Try the main dataset endpoint first which should give us basic info
+            base_url = f"{self.base_url}"
+            sample_url = f"{base_url}/dataset/subject"
+            sample_params = {"datasetId": dataset_id.casefold()}
 
-                response = await client.get(url, params=params, headers=self.headers)
+            logger.info(f"Requesting GTEx sample data from: {sample_url}")
+            sample_response = await client.get(
+                sample_url, params=sample_params, headers=self.headers
+            )
 
-                if response.status_code != 200:
-                    logger.error(
-                        f"Failed to fetch GTEx sample metadata: {response.status_code}"
-                    )
-                    return []
-
-                data = response.json()
-
-                # Process the actual sample data from the GTEx API
-                # Convert to standardized format for your application
-                samples = []
-                for sample in data.get("data", []):
-                    # Map the actual GTEx fields to your required fields
-                    samples.append(
+            if sample_response.status_code == 200:
+                sample_data = sample_response.json()
+                logger.info(f"Successfully retrieved sample data from {sample_url}")
+                for sample in sample_data.get("data", []):
+                    metadata_samples.append(
                         {
-                            "sample_id": sample.get("sampleId"),
-                            "subject_id": sample.get("donorId"),
-                            "age": sample.get("age"),
+                            "subject_id": sample.get("subjectId"),
                             "sex": sample.get("sex"),
-                            # Other fields as available in the API response
+                            "dataset_id": sample.get("datasetId"),
+                            "ageBracket": sample.get("ageBracket"),
                         }
                     )
-
-                return {
-                    "status": "success",
-                    "message": "Metadata retrieved successfully",
-                    "data": {"samples": samples},
-                }
-
-        except Exception as e:
-            logger.error(f"Error retrieving GTEx sample metadata: {str(e)}")
-            return []
+        return metadata_samples
 
 
 expression_endpoints = ExpressionEndpoints()

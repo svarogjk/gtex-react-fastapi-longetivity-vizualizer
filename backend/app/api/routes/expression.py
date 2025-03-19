@@ -68,8 +68,6 @@ async def get_dataset_metadata(dataset_id: str):
     """Get metadata information for a dataset"""
     try:
         result = await expression_endpoints.get_dataset_metadata(dataset_id)
-        if result["status"] == "error":
-            raise HTTPException(status_code=404, detail=result["message"])
         return result
     except Exception as e:
         logger.error(f"Error getting dataset metadata: {str(e)}")
@@ -90,10 +88,6 @@ async def get_gene_tissue_expression(gene: str, tissue: str):
             [gene], tissue
         )
         result = expression_endpoints.process_expression_data(df_expr, df_meta)
-
-        if result["status"] == "no_data":
-            raise HTTPException(status_code=404, detail="No expression data found")
-
         return result
     except HTTPException as he:
         raise he
@@ -111,22 +105,8 @@ async def get_tissue_summary(gene: str):
             raise HTTPException(
                 status_code=400, detail=f"Invalid gene symbol format: {gene}"
             )
-
         result = await expression_endpoints.get_tissue_expression_summary_by_gene(gene)
-
-        # Handle different error cases
-        if result["status"] == "error":
-            if "not found" in result["message"].lower():
-                raise HTTPException(
-                    status_code=404, detail=f"Gene {gene} not found in GTEx database"
-                )
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error processing gene {gene}: {result['message']}",
-            )
-
         return result
-
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -183,16 +163,6 @@ async def get_dataset_expression_summaries(
                 gene, normalized_tissue
             )
         )
-
-        if result["status"] == "error":
-            if "not found" in result["message"].lower():
-                raise HTTPException(
-                    status_code=404, detail=f"Gene {gene} not found in GTEx database"
-                )
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error processing gene {gene} in tissue {normalized_tissue}: {result['message']}",
-            )
 
         # Get related datasets with expression data for this gene-tissue combination
         related_datasets = []
