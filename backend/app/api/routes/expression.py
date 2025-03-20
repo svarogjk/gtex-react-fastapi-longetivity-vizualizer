@@ -169,13 +169,13 @@ async def get_dataset_expression_summaries(
 
         # First, try to get GTEx dataset information
         gtex_dataset = {
-            "dataset_id": result["data"]["metadata"]["dataset_id"],
+            "dataset_id": result["metadata"]["dataset_id"],
             "dataset_name": "GTEx v8",
             "dataset_type": "GTEx",
-            "median_expression": result["data"]["statistics"]["median"],
-            "mean_expression": result["data"]["statistics"]["mean"],
-            "unit": result["data"]["metadata"]["unit"],
-            "sample_count": result["data"]["statistics"]["sample_count"],
+            "median_expression": result["statistics"]["median"],
+            "mean_expression": result["statistics"]["mean"],
+            "unit": result["metadata"]["unit"],
+            "sample_count": result["statistics"]["sample_count"],
             "source": "GTEx",
         }
         related_datasets.append(gtex_dataset)
@@ -213,18 +213,15 @@ async def get_dataset_expression_summaries(
 
         # Return the consolidated result
         return {
-            "status": "success",
-            "data": {
-                "gene": gene,
-                "tissue": normalized_tissue,
-                "original_tissue_query": tissue,
-                "tissue_display_name": result["data"]["tissue_display_name"],
-                "gtex_summary": {
-                    "statistics": result["data"]["statistics"],
-                    "tissue_context": result["data"]["tissue_context"],
-                },
-                "datasets": related_datasets[:limit],
+            "gene": gene,
+            "tissue": normalized_tissue,
+            "original_tissue_query": tissue,
+            "tissue_display_name": result["tissue_display_name"],
+            "gtex_summary": {
+                "statistics": result["statistics"],
+                "tissue_context": result["tissue_context"],
             },
+            "datasets": related_datasets[:limit],
         }
 
     except HTTPException as he:
