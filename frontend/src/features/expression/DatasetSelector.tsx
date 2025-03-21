@@ -41,13 +41,23 @@ export const DatasetSelector: React.FC = () => {
       <div className="bg-white shadow rounded-lg">
         <div className="p-6">
           <ErrorMessage message={error.toString()} />
+          
+          {/* Debug information */}
+          <details className="mt-2 text-xs text-gray-500">
+            <summary>Debug Info</summary>
+            <div className="p-2 bg-gray-50 mt-1 rounded">
+              <p>Error: {JSON.stringify(error)}</p>
+              <p>Gene: {selectedGene}</p>
+              <p>Tissue: {selectedTissue}</p>
+            </div>
+          </details>
         </div>
       </div>
     );
   }
 
   // Handle case where there's no dataset data or empty datasets array
-  if (!data || !data.data || !data.data.datasets || data.data.datasets.length === 0) {
+  if (!data || !data || !data.datasets || data.datasets.length === 0) {
     return (
       <div className="bg-white shadow rounded-lg">
         <div className="p-6">
@@ -71,7 +81,7 @@ export const DatasetSelector: React.FC = () => {
             onChange={(e) => handleDatasetChange(e.target.value)}
           >
             <option value="">Choose a dataset...</option>
-            {data.data.datasets.map((dataset) => (
+            {data.datasets.map((dataset) => (
               <option
                 key={dataset.dataset_id}
                 value={dataset.dataset_id}
@@ -85,18 +95,18 @@ export const DatasetSelector: React.FC = () => {
             <div className="mt-2 p-2 bg-gray-50 rounded-md">
               <p className="text-sm font-medium">
                 Selected: {
-                  data.data.datasets.find(ds => ds.dataset_id === selectedDataset)?.dataset_name || 
+                  data.datasets.find(ds => ds.dataset_id === selectedDataset)?.dataset_name || 
                   selectedDataset
                 }
               </p>
-              {data.data.datasets.find(ds => ds.dataset_id === selectedDataset)?.sample_count > 0 && (
+              {data.datasets.find(ds => ds.dataset_id === selectedDataset)?.sample_count > 0 && (
                 <p className="text-xs text-gray-600 mt-1">
-                  Samples: {data.data.datasets.find(ds => ds.dataset_id === selectedDataset).sample_count}
+                  Samples: {data.datasets.find(ds => ds.dataset_id === selectedDataset).sample_count}
                 </p>
               )}
-              {data.data.datasets.find(ds => ds.dataset_id === selectedDataset)?.source && (
+              {data.datasets.find(ds => ds.dataset_id === selectedDataset)?.source && (
                 <p className="text-xs text-gray-600">
-                  Source: {data.data.datasets.find(ds => ds.dataset_id === selectedDataset).source}
+                  Source: {data.datasets.find(ds => ds.dataset_id === selectedDataset).source}
                 </p>
               )}
             </div>
@@ -107,7 +117,7 @@ export const DatasetSelector: React.FC = () => {
             <summary>Debug Info</summary>
             <div className="p-2 bg-gray-50 mt-1 rounded">
               <p>Selected: {selectedDataset || 'None'}</p>
-              <p>Datasets count: {data.data.datasets.length}</p>
+              <p>Datasets count: {data.datasets.length}</p>
               <p>Gene: {selectedGene}</p>
               <p>Tissue: {selectedTissue}</p>
             </div>

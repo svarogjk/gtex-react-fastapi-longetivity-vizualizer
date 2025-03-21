@@ -186,3 +186,4 @@ yarn.lock
 
 # Optional eslint cache
 .eslintcache
+frontend/launch.json

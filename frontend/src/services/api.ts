@@ -26,12 +26,9 @@ interface GenesResponse {
 }
 
 interface TissueExpressionResponse {
-  status: string;
-  data: {
-    gene: string;
-    gencode_id: string;
-    tissue_expression: TissueExpression[];
-  };
+  gene: string;
+  gencode_id: string;
+  tissue_expression: TissueExpression[];
 }
 
 interface MetadataColumn {
@@ -71,19 +68,15 @@ interface DatasetSummary {
 }
 
 interface ExpressionDataResponse {
-  status: string;
-  message: string;
-  data: {
-    expression: any[];
-    metadata: any[];
-    summary: {
-      n_samples: number;
-      n_genes: number;
-      tissue: string;
-      unit: string;
-      gene_stats: Record<string, any>;
-      correlations: Record<string, any>;
-    };
+  expression: any[];
+  metadata: any[];
+  summary: {
+    n_samples: number;
+    n_genes: number;
+    tissue: string;
+    unit: string;
+    gene_stats: Record<string, any>;
+    correlations: Record<string, any>;
   };
 }
 

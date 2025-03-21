@@ -19,13 +19,13 @@ export const TissueSelector: React.FC = () => {
   };
 
   // Don't render if no gene is selected or if there's no expression data
-  if (!selectedGene || !data || !data.data.tissue_expression || data.data.tissue_expression.length === 0) {
+  if (!selectedGene || !data || !data.tissue_expression || data.tissue_expression.length === 0) {
     return null;
   }
 
   // Create a deduplicated list of tissues to prevent the duplicate key issue
   const tissueMap = new Map();
-  data.data.tissue_expression.forEach(item => {
+  data.tissue_expression.forEach(item => {
     // Only add the tissue if it hasn't been added yet
     if (!tissueMap.has(item.tissue)) {
       tissueMap.set(item.tissue, {

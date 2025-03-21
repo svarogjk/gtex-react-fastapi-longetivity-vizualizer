@@ -38,7 +38,7 @@ export const TissueExpressionChart: React.FC = () => {
     );
   }
 
-  if (!data || !data.data.tissue_expression || data.data.tissue_expression.length === 0) {
+  if (!data || !data.tissue_expression || data.tissue_expression.length === 0) {
     return (
       <div className="bg-white shadow rounded-lg">
         <div className="p-6">
@@ -49,7 +49,7 @@ export const TissueExpressionChart: React.FC = () => {
   }
 
   // Prepare data for the chart
-  const sortedData = [...data.data.tissue_expression]
+  const sortedData = [...data.tissue_expression]
     .sort((a, b) => b.median_expression - a.median_expression)
     .slice(0, 15) // Show top 15 tissues
     .map(item => ({
