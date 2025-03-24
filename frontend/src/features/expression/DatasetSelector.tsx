@@ -5,7 +5,7 @@ import { useGetDatasetsSummaryQuery } from '../../services/api';
 import { Loading } from '../../components/common/Loading';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 
-export const DatasetSelector: React.FC = () => {
+export const DatasetSelector = () => {
   const dispatch = useAppDispatch();
   const selectedGene = useAppSelector(state => state.expression.selectedGene);
   const selectedTissue = useAppSelector(state => state.expression.selectedTissue);

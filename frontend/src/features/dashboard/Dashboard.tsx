@@ -1,8 +1,7 @@
-import React from 'react';
 import { ExpressionAnalysis } from '../expression/ExpressionAnalysis';
 import { Header } from '../../components/layout/Header';
 
-export const Dashboard: React.FC = () => {
+export const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />

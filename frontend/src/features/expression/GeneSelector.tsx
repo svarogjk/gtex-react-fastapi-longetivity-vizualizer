@@ -5,7 +5,7 @@ import { useSearchGenesQuery } from '../../services/api';
 import { Loading } from '../../components/common/Loading';
 import { ErrorMessage } from '../../components/common/ErrorMessage';
 
-export const GeneSelector: React.FC = () => {
+export const GeneSelector = () => {
   const dispatch = useAppDispatch();
   const selectedGene = useAppSelector(state => state.expression.selectedGene);
   

@@ -75,7 +75,7 @@ export const TissueExpressionChart: React.FC = () => {
               <XAxis type="number" label={{ value: 'Median Expression', position: 'insideBottom', offset: -5 }} />
               <YAxis type="category" dataKey="name" width={100} />
               <Tooltip
-                formatter={(value: any, name: any) => [`${value.toFixed(2)}`, 'Expression']}
+                formatter={(value: any) => [`${value.toFixed(2)}`, 'Expression']}
                 labelFormatter={(label) => `Tissue: ${label}`}
               />
               <Bar dataKey="median_expression" fill="#8884d8" />

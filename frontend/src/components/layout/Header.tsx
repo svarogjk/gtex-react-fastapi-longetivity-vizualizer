@@ -1,7 +1,6 @@
-import React from 'react';
 import { Activity, Database, Thermometer } from 'lucide-react';
 
-export const Header: React.FC = () => {
+export const Header = () => {
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 py-4">

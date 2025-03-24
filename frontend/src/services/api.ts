@@ -150,12 +150,12 @@ export const api = createApi({
     }),
     
     getDatasetMetadata: builder.query<DatasetMetadataResponse, string>({
-      query: (datasetId) => `datasets/${datasetId}/metadata`,
+      query: (datasetId) => `/expression/datasets/${datasetId}/metadata`,
       providesTags: (result, error, datasetId) => [{ type: 'Dataset', id: datasetId }]
     }),
     
     getDatasetDetails: builder.query<DatasetDetailsResponse, string>({
-      query: (datasetId) => `datasets/${datasetId}/details`,
+      query: (datasetId) => `/expression/ddatasets/${datasetId}/details`,
       providesTags: (result, error, datasetId) => [{ type: 'Dataset', id: datasetId }]
     }),
     
@@ -226,10 +226,9 @@ export default {
   },
 
   getDatasetMetadata: async (datasetId: string): Promise<DatasetMetadataResponse> => {
-    const response = await fetch(`/api/datasets/${datasetId}/metadata`);
+    const response = await fetch(`/api/expression/datasets/${datasetId}/metadata`);
     if (!response.ok) throw new Error(`Failed to fetch metadata for dataset ${datasetId}`);
     return response.json();
   },
   
-  // Add additional methods as needed for imperative calls
 };

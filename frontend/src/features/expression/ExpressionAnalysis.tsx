@@ -1,11 +1,11 @@
-import React from 'react';
 import { GeneSelector } from './GeneSelector';
 import { TissueSelector } from './TissueSelector';
 import { DatasetSelector } from './DatasetSelector'; 
 import { TissueExpressionChart } from './TissueExpressionChart';
+import { DatasetMetadataTable } from './DatasetMetadataTable'; 
 import { useAppSelector } from '../../app/hooks';
 
-export const ExpressionAnalysis: React.FC = () => {
+export const ExpressionAnalysis = () => {
   // Get selected gene from Redux store
   const selectedGene = useAppSelector(state => state.expression.selectedGene);
   const selectedTissue = useAppSelector(state => state.expression.selectedTissue);
@@ -24,7 +24,12 @@ export const ExpressionAnalysis: React.FC = () => {
             <TissueSelector />
 
             {selectedTissue && (
-              <DatasetSelector />
+              <>
+                <DatasetSelector />
+                {selectedDataset && (
+                  <DatasetMetadataTable />
+                )}
+              </>
             )}
           </>
         )}
