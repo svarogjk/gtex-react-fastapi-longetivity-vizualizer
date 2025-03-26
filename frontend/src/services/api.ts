@@ -31,15 +31,15 @@ interface TissueExpressionResponse {
   tissue_expression: TissueExpression[];
 }
 
-interface MetadataColumn {
-  name: string;
-  unique_values: number;
-  type: string;
+interface MetadataSubject {
+  subject_id: string;
+  sex: string;
+  dataset_id: string;
+  ageBracket: string;
 }
 
 interface DatasetMetadataResponse {
-  status: string;
-  columns: MetadataColumn[];
+  subjects: MetadataSubject[];
 }
 
 interface DatasetDetailsResponse {

@@ -70,43 +70,41 @@ export const DatasetMetadataTable = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Column Name
+                  Subject Id
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
+                  Sex
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Unique Values
+                  Age Bracket
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {data.columns.map((column, index) => (
-                <tr key={`column-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {column.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {column.type}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {column.unique_values}
+              {data.subjects && data.subjects.length > 0 ? (
+                data.subjects.map(item => (
+                  <tr key={item.subject_id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {item.subject_id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.sex}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.ageBracket}
+                    </td>
+                  </tr>
+                ))
+              ) :(
+                <tr>
+                  <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
+                    No subjects found in this dataset.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
-        
-        {/* Debug information */}
-        <details className="mt-2 text-xs text-gray-500">
-          <summary>Debug Info</summary>
-          <div className="p-2 bg-gray-50 mt-1 rounded">
-            <p>Dataset: {selectedDataset}</p>
-            <p>Status: {data.status}</p>
-            <p>Column count: {data.columns.length}</p>
-          </div>
-        </details>
       </div>
     </div>
   );
