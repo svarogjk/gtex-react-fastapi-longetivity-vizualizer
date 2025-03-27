@@ -31,16 +31,14 @@ interface TissueExpressionResponse {
   tissue_expression: TissueExpression[];
 }
 
-interface MetadataSubject {
+interface Subject {
   subject_id: string;
   sex: string;
   dataset_id: string;
   ageBracket: string;
 }
 
-interface DatasetMetadataResponse {
-  subjects: MetadataSubject[];
-}
+type DatasetMetadataResponse = Subject[];
 
 interface DatasetDetailsResponse {
   success: boolean;

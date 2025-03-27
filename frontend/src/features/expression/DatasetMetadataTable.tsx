@@ -65,7 +65,7 @@ export const DatasetMetadataTable = () => {
           {`Displaying metadata for dataset: ${selectedDataset}`}
         </p>
         
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-72">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -81,8 +81,8 @@ export const DatasetMetadataTable = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {data.subjects && data.subjects.length > 0 ? (
-                data.subjects.map(item => (
+              {data && data.length > 0 ? (
+                data.map(item => (
                   <tr key={item.subject_id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {item.subject_id}
