@@ -78,6 +78,9 @@ export const DatasetMetadataTable = () => {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Age Bracket
                 </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Hardy Scale
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -91,7 +94,10 @@ export const DatasetMetadataTable = () => {
                       {item.sex}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.ageBracket}
+                      {item.age_bracket}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.hardy_scale}
                     </td>
                   </tr>
                 ))

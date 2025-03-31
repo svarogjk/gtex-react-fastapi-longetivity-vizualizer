@@ -619,7 +619,8 @@ class ExpressionEndpoints:
                             "subject_id": sample.get("subjectId"),
                             "sex": sample.get("sex"),
                             "dataset_id": sample.get("datasetId"),
-                            "ageBracket": sample.get("ageBracket"),
+                            "age_bracket": sample.get("ageBracket"),
+                            "hardy_scale": sample.get("hardyScale"),
                         }
                     )
         return metadata_samples

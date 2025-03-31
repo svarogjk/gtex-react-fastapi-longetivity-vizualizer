@@ -35,7 +35,8 @@ interface Subject {
   subject_id: string;
   sex: string;
   dataset_id: string;
-  ageBracket: string;
+  age_bracket: string;
+  hardy_scale: string;
 }
 
 type DatasetMetadataResponse = Subject[];
