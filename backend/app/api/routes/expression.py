@@ -180,38 +180,27 @@ async def get_dataset_expression_summaries(
         }
         related_datasets.append(gtex_dataset)
 
-        # Try to get additional datasets from GEO with this gene-tissue combination
-        try:
-            # Query the search service for related datasets
-            additional_datasets = await search_service.search_datasets(
-                genes=[gene], tissues=[normalized_tissue]
-            )
+        additional_datasets = await search_service.search_datasets(
+            genes=[gene], tissues=[normalized_tissue]
+        )
 
-            if additional_datasets and "datasets" in additional_datasets:
-                for dataset in additional_datasets["datasets"]:
-                    # If we have expression data for this dataset, add it
-                    if "median_expression" in dataset:
-                        related_datasets.append(
-                            {
-                                "dataset_id": dataset["dataset_id"],
-                                "dataset_name": dataset.get(
-                                    "title", dataset.get("name", "Unknown")
-                                ),
-                                "dataset_type": dataset.get("type", "Unknown"),
-                                "median_expression": dataset["median_expression"],
-                                "mean_expression": dataset.get("mean_expression", None),
-                                "unit": dataset.get("unit", "Unknown"),
-                                "sample_count": dataset.get("sample_count", 0),
-                                "source": dataset.get("source", "GEO"),
-                            }
-                        )
-        except Exception as e:
-            logger.warning(
-                f"Error retrieving additional datasets for {gene} in {normalized_tissue}: {str(e)}"
-            )
-            # Continue with just the GTEx data if there's an error with additional datasets
-
-        # Return the consolidated result
+        if additional_datasets and "datasets" in additional_datasets:
+            for dataset in additional_datasets["datasets"]:
+                if "median_expression" in dataset:
+                    related_datasets.append(
+                        {
+                            "dataset_id": dataset["dataset_id"],
+                            "dataset_name": dataset.get(
+                                "title", dataset.get("name", "Unknown")
+                            ),
+                            "dataset_type": dataset.get("type", "Unknown"),
+                            "median_expression": dataset["median_expression"],
+                            "mean_expression": dataset.get("mean_expression", None),
+                            "unit": dataset.get("unit", "Unknown"),
+                            "sample_count": dataset.get("sample_count", 0),
+                            "source": dataset.get("source", "GEO"),
+                        }
+                    )
         return {
             "gene": gene,
             "tissue": normalized_tissue,
@@ -232,69 +221,3 @@ async def get_dataset_expression_summaries(
             status_code=500,
             detail=f"Internal server error processing gene {gene} in tissue {tissue}",
         )
-
-
-@router.get("/debug/gtex/{gene}")
-async def debug_gtex_api(gene: str):
-    """Debug endpoint to test GTEx API connections"""
-    async with httpx.AsyncClient() as client:
-        results = {}
-
-        # Test gene lookup with new format
-        gene_url = f"{expression_endpoints.base_url}/reference/gene"
-        gene_params = {"geneId": gene.upper(), "pageSize": 1}
-
-        try:
-            gene_response = await client.get(
-                gene_url, params=gene_params, headers=expression_endpoints.headers
-            )
-            results["gene_lookup"] = {
-                "url": str(gene_response.url),
-                "status": gene_response.status_code,
-                "headers": dict(gene_response.headers),
-                "response": gene_response.text[:500],
-            }
-        except Exception as e:
-            results["gene_lookup"] = {"error": str(e)}
-
-        # Test alternative lookup format
-        alt_params = {"geneId": f"ENSG00000146648.{gene.upper()}", "pageSize": 1}
-
-        try:
-            alt_response = await client.get(
-                gene_url, params=alt_params, headers=expression_endpoints.headers
-            )
-            results["alternative_lookup"] = {
-                "url": str(alt_response.url),
-                "status": alt_response.status_code,
-                "headers": dict(alt_response.headers),
-                "response": alt_response.text[:500],
-            }
-        except Exception as e:
-            results["alternative_lookup"] = {"error": str(e)}
-
-        # Test expression endpoint
-        expr_url = (
-            f"{expression_endpoints.base_url}/expression/medianTranscriptExpression"
-        )
-        expr_params = {"datasetId": "gtex_v8", "geneId": gene.upper(), "format": "json"}
-
-        try:
-            expr_response = await client.get(
-                expr_url, params=expr_params, headers=expression_endpoints.headers
-            )
-            results["expression_lookup"] = {
-                "url": str(expr_response.url),
-                "status": expr_response.status_code,
-                "headers": dict(expr_response.headers),
-                "response": expr_response.text[:500],
-            }
-        except Exception as e:
-            results["expression_lookup"] = {"error": str(e)}
-
-        return {
-            "status": "success",
-            "results": results,
-            "base_url": expression_endpoints.base_url,
-            "headers": expression_endpoints.headers,
-        }

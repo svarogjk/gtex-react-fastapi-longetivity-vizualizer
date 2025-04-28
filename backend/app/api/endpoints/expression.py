@@ -140,78 +140,71 @@ class ExpressionEndpoints:
         self, genes: List[str], tissue: str
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Fetch gene expression data for multiple genes"""
-        try:
-            normalized_tissue = self.valid_tissues.get(tissue.upper(), tissue)
+        normalized_tissue = self.valid_tissues.get(tissue.upper(), tissue)
 
-            # Get Gencode IDs for all genes
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                gencode_tasks = [self.get_gencode_id(gene) for gene in genes]
-                gencode_ids = await gather(*gencode_tasks)
+        # Get Gencode IDs for all genes
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            gencode_tasks = [self.get_gencode_id(gene) for gene in genes]
+            gencode_ids = await gather(*gencode_tasks)
 
-                # Filter out None values and create gene mapping
-                valid_genes = [
-                    (gene, gid) for gene, gid in zip(genes, gencode_ids) if gid
-                ]
+            # Filter out None values and create gene mapping
+            valid_genes = [(gene, gid) for gene, gid in zip(genes, gencode_ids) if gid]
 
-                if not valid_genes:
-                    logger.warning("No valid Gencode IDs found")
-                    return pd.DataFrame(), pd.DataFrame()
-
-                # Make request for expression data
-                url = f"{self.base_url}/expression/geneExpression"
-                params = {
-                    "gencodeId": [gid for _, gid in valid_genes],
-                    "tissueSiteDetailId": [normalized_tissue],
-                    "datasetId": self.dataset,
-                    "format": "json",
-                }
-
-                data = await self._make_request(client, url, params)
-
-                if data and "data" in data:
-                    expression_data = data["data"]
-                    expression_dict = {}
-                    metadata_dict = None
-
-                    # Process each gene's data
-                    for entry in expression_data:
-                        gene_symbol = entry.get("geneSymbol")
-                        expression_values = entry.get("data", [])
-                        expression_dict[gene_symbol] = expression_values
-
-                        # Store metadata from first entry
-                        if metadata_dict is None:
-                            metadata_dict = {
-                                "tissue": normalized_tissue,
-                                "dataset_id": entry.get("datasetId"),
-                                "ontology_id": entry.get("ontologyId"),
-                                "unit": entry.get("unit"),
-                            }
-
-                    if expression_dict:
-                        # Create expression DataFrame
-                        df_expr = pd.DataFrame(expression_dict)
-                        df_expr.index = [
-                            f"GTEX_SAMPLE_{i+1:04d}" for i in range(len(df_expr))
-                        ]
-                        df_expr.index.name = "sample_id"
-                        df_expr = df_expr.reset_index()
-
-                        # Create metadata DataFrame
-                        df_meta = pd.DataFrame(
-                            [
-                                {**metadata_dict, "sample_id": sample_id}
-                                for sample_id in df_expr["sample_id"]
-                            ]
-                        )
-
-                        return df_expr, df_meta
-
-                logger.warning("No expression data received")
+            if not valid_genes:
+                logger.warning("No valid Gencode IDs found")
                 return pd.DataFrame(), pd.DataFrame()
 
-        except Exception as e:
-            logger.error(f"Error getting expression data: {str(e)}")
+            # Make request for expression data
+            url = f"{self.base_url}/expression/geneExpression"
+            params = {
+                "gencodeId": [gid for _, gid in valid_genes],
+                "tissueSiteDetailId": [normalized_tissue],
+                "datasetId": self.dataset,
+                "format": "json",
+            }
+
+            data = await self._make_request(client, url, params)
+
+            if data and "data" in data:
+                expression_data = data["data"]
+                expression_dict = {}
+                metadata_dict = None
+
+                # Process each gene's data
+                for entry in expression_data:
+                    gene_symbol = entry.get("geneSymbol")
+                    expression_values = entry.get("data", [])
+                    expression_dict[gene_symbol] = expression_values
+
+                    # Store metadata from first entry
+                    if metadata_dict is None:
+                        metadata_dict = {
+                            "tissue": normalized_tissue,
+                            "dataset_id": entry.get("datasetId"),
+                            "ontology_id": entry.get("ontologyId"),
+                            "unit": entry.get("unit"),
+                        }
+
+                if expression_dict:
+                    # Create expression DataFrame
+                    df_expr = pd.DataFrame(expression_dict)
+                    df_expr.index = [
+                        f"GTEX_SAMPLE_{i+1:04d}" for i in range(len(df_expr))
+                    ]
+                    df_expr.index.name = "sample_id"
+                    df_expr = df_expr.reset_index()
+
+                    # Create metadata DataFrame
+                    df_meta = pd.DataFrame(
+                        [
+                            {**metadata_dict, "sample_id": sample_id}
+                            for sample_id in df_expr["sample_id"]
+                        ]
+                    )
+
+                    return df_expr, df_meta
+
+            logger.warning("No expression data received")
             return pd.DataFrame(), pd.DataFrame()
 
     @cache.memoize(timeout=3600)

@@ -1,51 +1,39 @@
 # app/services/analysis_service.py
 import pandas as pd
 import numpy as np
-from lifelines import KaplanMeierFitter
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import LabelEncoder
+from lifelines import KaplanMeierFitter, CoxPHFitter
 from typing import Dict, Any
+
+from app.api.endpoints.expression import expression_endpoints
 
 
 class AnalysisService:
-    def analyze_survival(self, df: pd.DataFrame, gene: str) -> Dict[str, Any]:
-        """Perform survival analysis"""
-        kmf = KaplanMeierFitter()
 
-        # Split by median expression
-        median_expr = df[gene].median()
-        high_expr = df[gene] > median_expr
+    def __init__(self):
+        self.kmf = KaplanMeierFitter()
+        self.cph = CoxPHFitter()
+        self.le_hardy = LabelEncoder()
 
-        results = {}
-
-        # High expression group
-        kmf.fit(
-            df.loc[high_expr, "time"],
-            df.loc[high_expr, "event"],
-            label="High Expression",
+    async def prepare_survival_data(self, gene: str, tissue: str) -> pd.DataFrame:
+        df_expr, _ = await expression_endpoints.get_expression_data([gene], tissue)
+        df_expr["subject_id"] = (
+            df_expr["sample_id"].str.split("-").str[:2].str.join("-")
         )
-        results["high_expression"] = {
-            "survival": kmf.survival_function_.to_dict(),
-            "median": kmf.median_survival_time_,
-        }
-
-        # Low expression group
-        kmf.fit(
-            df.loc[~high_expr, "time"],
-            df.loc[~high_expr, "event"],
-            label="Low Expression",
+        df_expr = df_expr.groupby("subject_id", as_index=False).agg({gene: "mean"})
+        metadata = await expression_endpoints.get_dataset_metadata("gtex_v8")
+        df_meta = pd.DataFrame(metadata)
+        df_meta["hardy_numeric"] = self.le_hardy.fit_transform(df_meta["hardyScale"])
+        df_meta[["age_low", "age_high"]] = (
+            df_meta["ageBracket"].str.split("-", expand=True).astype(int)
         )
-        results["low_expression"] = {
-            "survival": kmf.survival_function_.to_dict(),
-            "median": kmf.median_survival_time_,
-        }
-
-        return results
-
-    def analyze_expression_patterns(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze expression patterns"""
-        return {
-            "distribution": df["expression"].describe().to_dict(),
-            "correlations": df.pivot(columns="gene", values="expression")
-            .corr()
-            .to_dict(),
-        }
+        df_meta["time"] = (df_meta["age_low"] + df_meta["age_high"]) / 2
+        df_data = df_expr.merge(
+            df_meta, how="inner", left_on="subject_id", right_on="subjectId"
+        )
+        df_data["event"] = 1
+        median_expr = df_data["gene"].median()
+        df_data["group_by_median"] = np.where(
+            df_data[gene] > median_expr, "High", "Low"
+        )
+        return df_data
