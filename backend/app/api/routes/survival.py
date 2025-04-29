@@ -1,7 +1,7 @@
 # app/api/routes/survival.py
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict
-from app.services.analysis_service import AnalysisService
+from backend.app.services.survival_analysis_service import SurvivalAnalysisService
 from app.services.gtex_service import GTExService
 
 router = APIRouter()
@@ -11,7 +11,7 @@ router = APIRouter()
 async def get_survival_analysis(
     gene: str,
     gtex_service: GTExService = Depends(),
-    analysis_service: AnalysisService = Depends(),
+    analysis_service: SurvivalAnalysisService = Depends(),
 ) -> Dict:
     """Get survival analysis for a gene"""
     if not gene:
