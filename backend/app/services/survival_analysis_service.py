@@ -1,7 +1,6 @@
 # app/services/analysis_service.py
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
 from lifelines import KaplanMeierFitter, CoxPHFitter
 from lifelines.statistics import logrank_test
 from typing import Dict, Any
@@ -14,7 +13,6 @@ class SurvivalAnalysisService:
     def __init__(self):
         self.kmf = KaplanMeierFitter()
         self.cph = CoxPHFitter()
-        self.le_hardy = LabelEncoder()
 
     def find_optimal_cutpoint(
         self,
@@ -94,19 +92,15 @@ class SurvivalAnalysisService:
 
     async def prepare_survival_data(self, gene: str, tissue: str) -> pd.DataFrame:
         df_expr, _ = await expression_endpoints.get_expression_data([gene], tissue)
-        df_expr["subject_id"] = (
-            df_expr["sample_id"].str.split("-").str[:2].str.join("-")
-        )
+        # df_expr["subject_id"] = (
+        #     df_expr["sample_id"].str.split("-").str[:2].str.join("-")
+        # )
+        df_expr["subject_id"] = df_expr["sample_id"].values
         df_expr = df_expr.groupby("subject_id", as_index=False).agg({gene: "mean"})
-        metadata = await expression_endpoints.get_dataset_metadata("gtex_v8")
-        df_meta = pd.DataFrame(metadata)
-        df_meta["hardy_numeric"] = self.le_hardy.fit_transform(df_meta["hardyScale"])
-        df_meta[["age_low", "age_high"]] = (
-            df_meta["ageBracket"].str.split("-", expand=True).astype(int)
-        )
-        df_meta["time"] = (df_meta["age_low"] + df_meta["age_high"]) / 2
+        metadata = await expression_endpoints.get_subject_metadata("gtex_v8")
+        df_meta = expression_endpoints.prepare_df_meta(metadata)
         df_data = df_expr.merge(
-            df_meta, how="inner", left_on="subject_id", right_on="subjectId"
+            df_meta, how="inner", left_on="subject_id", right_on="subject_id"
         )
         df_data["event"] = 1
         optimal_cutpoint, test_stat, p_value = self.find_optimal_cutpoint(
@@ -328,3 +322,75 @@ class SurvivalAnalysisService:
 
         results["interpretation"] = interpretation
         return results
+
+    async def analyze_gene_set_survival(
+        self, genes: list[str], tissue: str
+    ) -> dict[str, Any]:
+        """
+        Perform survival analysis on a set of genes
+        """
+        results = {}
+        for gene in genes:
+            gene_result = await self.perform_kaplan_meier_analysis(gene, tissue)
+            results[gene] = gene_result
+        significant_genes_continuous = []
+        significant_genes_binary = []
+        protective_genes = []
+        risk_genes = []
+        for gene, data in results.items():
+            if (
+                "statistical_analysis" in data
+                and "cox_models" in data["statistical_analysis"]
+                and "continuous_expression"
+                in data["statistical_analysis"]["cox_models"]
+                and "gene_expression_is_significant"
+                in data["statistical_analysis"]["cox_models"]["continuous_expression"]
+                and data["statistical_analysis"]["cox_models"]["continuous_expression"][
+                    "gene_expression_is_significant"
+                ]
+            ):
+
+                significant_genes_continuous.append(gene)
+                coef = data["statistical_analysis"]["cox_models"][
+                    "continuous_expression"
+                ]["gene_expression_coef"]
+                if coef < 0:
+                    protective_genes.append(gene)
+                else:
+                    risk_genes.append(gene)
+            if (
+                "statistical_analysis" in data
+                and "cox_models" in data["statistical_analysis"]
+                and "binary_expression_group"
+                in data["statistical_analysis"]["cox_models"]
+                and "high_expression_group_is_significant"
+                in data["statistical_analysis"]["cox_models"]["binary_expression_group"]
+                and data["statistical_analysis"]["cox_models"][
+                    "binary_expression_group"
+                ]["high_expression_group_is_significant"]
+            ):
+                significant_genes_binary.append(gene)
+            cutpoint_info = {}
+        for gene, data in results.items():
+            if "metadata" in data and "cutpoint" in data["metadata"]:
+                cutpoint_info[gene] = {
+                    "value": data["metadata"]["cutpoint"]["value"],
+                    "type": data["metadata"]["cutpoint"]["type"],
+                }
+        summary = {
+            "total_genes_analyzed": len(genes),
+            "successful_analyses": sum(1 for gene, data in results.items()),
+            "significant_genes": {
+                "continuous_model": significant_genes_continuous,
+                "continuous_count": len(significant_genes_continuous),
+                "binary_model": significant_genes_binary,
+                "binary_count": len(significant_genes_binary),
+            },
+            "functional_groups": {
+                "protective_genes": protective_genes,
+                "risk_genes": risk_genes,
+            },
+            "cutpoints": cutpoint_info,
+            "tissue": tissue,
+        }
+        return {"gene_results": results, "summary": summary}

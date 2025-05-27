@@ -64,10 +64,10 @@ async def get_tissues():
 
 
 @router.get("/datasets/{dataset_id}/metadata")
-async def get_dataset_metadata(dataset_id: str):
+async def get_subject_metadata(dataset_id: str):
     """Get metadata information for a dataset"""
     try:
-        result = await expression_endpoints.get_dataset_metadata(dataset_id)
+        result = await expression_endpoints.get_subject_metadata(dataset_id)
         return result
     except Exception as e:
         logger.error(f"Error getting dataset metadata: {str(e)}")

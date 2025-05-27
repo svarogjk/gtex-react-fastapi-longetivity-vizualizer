@@ -1,4 +1,5 @@
 from tenacity import retry, stop_after_attempt, wait_exponential
+from sklearn.preprocessing import LabelEncoder
 from typing import List, Dict, Optional, Tuple, Any
 import pandas as pd
 import json
@@ -27,6 +28,8 @@ class ExpressionEndpoints:
             "limits": self.limits,
             "follow_redirects": True,
         }
+
+        self.le_hardy = LabelEncoder()
 
         # Define longevity-related genes and pathways
         self.longevity_genes = {
@@ -164,7 +167,6 @@ class ExpressionEndpoints:
             }
 
             data = await self._make_request(client, url, params)
-
             if data and "data" in data:
                 expression_data = data["data"]
                 expression_dict = {}
@@ -585,38 +587,78 @@ class ExpressionEndpoints:
         }
 
     @cache.memoize(timeout=3600)
-    async def get_dataset_metadata(self, dataset_id: str) -> Dict:
+    async def fetch_sample_data(self, client, subject):
+        subject_id = subject.get("subjectId")
+        sample_url = f"{self.base_url}/dataset/sample"
+        dataset_id = subject.get("datasetId")
+        subject_id = subject.get("subjectId")
+        sample_params = {
+            "datasetId": dataset_id,
+            "subjectId": subject_id,
+            "sortBy": "sampleId",
+            "sortDirection": "asc",
+        }
+        sample_response = await client.get(
+            sample_url, params=sample_params, headers=self.headers
+        )
+        if sample_response.status_code == 200:
+            sample_data = sample_response.json().get("data", {})
+        else:
+            sample_data = {}
+
+        return {
+            "subject_id": subject_id,
+            "sex": subject.get("sex"),
+            "dataset_id": subject.get("datasetId"),
+            "age_bracket": subject.get("ageBracket"),
+            "hardy_scale": subject.get("hardyScale"),
+            "sample_data": sample_data,
+        }
+
+    @cache.memoize(timeout=3600)
+    async def get_subject_metadata(self, dataset_id: str) -> list[dict]:
         """
-        Get sample metadata from GTEx API using available endpoints.
+        Get subject metadata from GTEx API using available endpoints.
         This function is designed to be robust against API changes.
         """
-        metadata_samples = []
+        metadata_subjects = []
         # Extract GTEx version from dataset_id
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             # Try the main dataset endpoint first which should give us basic info
-            base_url = f"{self.base_url}"
-            sample_url = f"{base_url}/dataset/subject"
-            sample_params = {"datasetId": dataset_id.casefold()}
+            subject_url = f"{self.base_url}/dataset/subject"
+            subject_params = {"datasetId": dataset_id.casefold()}
 
-            logger.info(f"Requesting GTEx sample data from: {sample_url}")
-            sample_response = await client.get(
-                sample_url, params=sample_params, headers=self.headers
+            logger.info(f"Requesting GTEx subject data from: {subject_url}")
+            subject_response = await client.get(
+                subject_url, params=subject_params, headers=self.headers
             )
 
-            if sample_response.status_code == 200:
-                sample_data = sample_response.json()
-                logger.info(f"Successfully retrieved sample data from {sample_url}")
-                for sample in sample_data.get("data", []):
-                    metadata_samples.append(
-                        {
-                            "subject_id": sample.get("subjectId"),
-                            "sex": sample.get("sex"),
-                            "dataset_id": sample.get("datasetId"),
-                            "age_bracket": sample.get("ageBracket"),
-                            "hardy_scale": sample.get("hardyScale"),
-                        }
-                    )
-        return metadata_samples
+            if subject_response.status_code == 200:
+                subject_data = subject_response.json()
+                logger.info(f"Successfully retrieved subject data from {subject_url}")
+                tasks = [
+                    self.fetch_sample_data(client, subject)
+                    for subject in subject_data.get("data", [])
+                ]
+                metadata_subjects = await gather(*tasks)
+        return metadata_subjects
+
+    def prepare_df_meta(self, metadata: list[dict]) -> pd.DataFrame:
+        df_meta = pd.DataFrame(metadata)
+        df_meta = df_meta.explode("sample_data")
+        df_meta = pd.concat(
+            [
+                df_meta.drop(columns=["sample_data"]).reset_index(drop=True),
+                pd.json_normalize(df_meta["sample_data"].values).reset_index(drop=True),
+            ],
+            axis=1,
+        )
+        df_meta["hardy_numeric"] = self.le_hardy.fit_transform(df_meta["hardy_scale"])
+        df_meta[["age_low", "age_high"]] = (
+            df_meta["age_bracket"].str.split("-", expand=True).astype(int)
+        )
+        df_meta["time"] = (df_meta["age_low"] + df_meta["age_high"]) / 2
+        return df_meta
 
 
 expression_endpoints = ExpressionEndpoints()
