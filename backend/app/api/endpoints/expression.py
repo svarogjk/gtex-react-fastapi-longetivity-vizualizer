@@ -164,6 +164,7 @@ class ExpressionEndpoints:
                 "tissueSiteDetailId": [normalized_tissue],
                 "datasetId": self.dataset,
                 "format": "json",
+                "itemsPerPage": 100000,
             }
 
             data = await self._make_request(client, url, params)
@@ -190,20 +191,8 @@ class ExpressionEndpoints:
                 if expression_dict:
                     # Create expression DataFrame
                     df_expr = pd.DataFrame(expression_dict)
-                    df_expr.index = [
-                        f"GTEX_SAMPLE_{i+1:04d}" for i in range(len(df_expr))
-                    ]
-                    df_expr.index.name = "sample_id"
-                    df_expr = df_expr.reset_index()
-
                     # Create metadata DataFrame
-                    df_meta = pd.DataFrame(
-                        [
-                            {**metadata_dict, "sample_id": sample_id}
-                            for sample_id in df_expr["sample_id"]
-                        ]
-                    )
-
+                    df_meta = pd.DataFrame([metadata_dict])
                     return df_expr, df_meta
 
             logger.warning("No expression data received")
@@ -587,7 +576,7 @@ class ExpressionEndpoints:
         }
 
     @cache.memoize(timeout=3600)
-    async def fetch_sample_data(self, client, subject):
+    async def fetch_subject_data(self, client, subject):
         subject_id = subject.get("subjectId")
         sample_url = f"{self.base_url}/dataset/sample"
         dataset_id = subject.get("datasetId")
@@ -637,11 +626,37 @@ class ExpressionEndpoints:
                 subject_data = subject_response.json()
                 logger.info(f"Successfully retrieved subject data from {subject_url}")
                 tasks = [
-                    self.fetch_sample_data(client, subject)
+                    self.fetch_subject_data(client, subject)
                     for subject in subject_data.get("data", [])
                 ]
                 metadata_subjects = await gather(*tasks)
         return metadata_subjects
+
+    @cache.memoize(timeout=3600)
+    async def get_sample_metadata(self, dataset_id: str, tissue: str) -> pd.DataFrame:
+        # Extract GTEx version from dataset_id
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            # Try the main dataset endpoint first which should give us basic info
+            sample_url = f"{self.base_url}/dataset/sample"
+            sample_params = {
+                "datasetId": dataset_id.casefold(),
+                "tissueSiteDetailId": tissue,
+                "dataType": "RNASEQ",
+                "itemsPerPage": 100000,
+            }
+
+            logger.info(f"Requesting GTEx subject data from: {sample_url}")
+            sample_response = await client.get(
+                sample_url, params=sample_params, headers=self.headers
+            )
+
+            if sample_response.status_code == 200:
+                sample_data = sample_response.json()
+                logger.info(f"Successfully retrieved sample data from {sample_url}")
+                samples = sample_data["data"]
+                df_sample = pd.DataFrame(samples)
+                return df_sample
+        return pd.DataFrame()
 
     def prepare_df_meta(self, metadata: list[dict]) -> pd.DataFrame:
         df_meta = pd.DataFrame(metadata)

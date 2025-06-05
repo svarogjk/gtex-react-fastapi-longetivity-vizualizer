@@ -92,16 +92,8 @@ class SurvivalAnalysisService:
 
     async def prepare_survival_data(self, gene: str, tissue: str) -> pd.DataFrame:
         df_expr, _ = await expression_endpoints.get_expression_data([gene], tissue)
-        # df_expr["subject_id"] = (
-        #     df_expr["sample_id"].str.split("-").str[:2].str.join("-")
-        # )
-        df_expr["subject_id"] = df_expr["sample_id"].values
-        df_expr = df_expr.groupby("subject_id", as_index=False).agg({gene: "mean"})
-        metadata = await expression_endpoints.get_subject_metadata("gtex_v8")
-        df_meta = expression_endpoints.prepare_df_meta(metadata)
-        df_data = df_expr.merge(
-            df_meta, how="inner", left_on="subject_id", right_on="subject_id"
-        )
+        df_meta = await expression_endpoints.get_sample_metadata("gtex_v8", tissue)
+        df_data = pd.concat([df_expr, df_meta], axis=1)
         df_data["event"] = 1
         optimal_cutpoint, test_stat, p_value = self.find_optimal_cutpoint(
             df_data, gene, time_col="time", event_col="event", method="maxstat"
