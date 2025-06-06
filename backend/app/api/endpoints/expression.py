@@ -658,21 +658,12 @@ class ExpressionEndpoints:
                 return df_sample
         return pd.DataFrame()
 
-    def prepare_df_meta(self, metadata: list[dict]) -> pd.DataFrame:
-        df_meta = pd.DataFrame(metadata)
-        df_meta = df_meta.explode("sample_data")
-        df_meta = pd.concat(
-            [
-                df_meta.drop(columns=["sample_data"]).reset_index(drop=True),
-                pd.json_normalize(df_meta["sample_data"].values).reset_index(drop=True),
-            ],
-            axis=1,
+    def prepare_df_meta(self, df_meta: pd.DataFrame) -> pd.DataFrame:
+        df_meta["hardyNumeric"] = self.le_hardy.fit_transform(df_meta["hardyScale"])
+        df_meta[["ageLow", "ageHigh"]] = (
+            df_meta["ageBracket"].str.split("-", expand=True).astype(int)
         )
-        df_meta["hardy_numeric"] = self.le_hardy.fit_transform(df_meta["hardy_scale"])
-        df_meta[["age_low", "age_high"]] = (
-            df_meta["age_bracket"].str.split("-", expand=True).astype(int)
-        )
-        df_meta["time"] = (df_meta["age_low"] + df_meta["age_high"]) / 2
+        df_meta["time"] = (df_meta["ageLow"] + df_meta["ageHigh"]) / 2
         return df_meta
 
 

@@ -93,6 +93,7 @@ class SurvivalAnalysisService:
     async def prepare_survival_data(self, gene: str, tissue: str) -> pd.DataFrame:
         df_expr, _ = await expression_endpoints.get_expression_data([gene], tissue)
         df_meta = await expression_endpoints.get_sample_metadata("gtex_v8", tissue)
+        df_meta = expression_endpoints.prepare_df_meta(df_meta)
         df_data = pd.concat([df_expr, df_meta], axis=1)
         df_data["event"] = 1
         optimal_cutpoint, test_stat, p_value = self.find_optimal_cutpoint(
@@ -142,7 +143,6 @@ class SurvivalAnalysisService:
                 },
             }
         }
-
         self.kmf.fit(
             df.loc[high_expr_mask, "time"],
             df.loc[high_expr_mask, "event"],
