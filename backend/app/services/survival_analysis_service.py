@@ -204,21 +204,24 @@ class SurvivalAnalysisService:
         results["statistical_analysis"]["logrank_test"] = {
             "p_value": float(logrank_result.p_value),
             "test_statistic": float(logrank_result.test_statistic),
-            "is_significant": logrank_result.p_value < 0.05,
+            "is_significant": bool(logrank_result.p_value < 0.05),
         }
         # Cox Proportional Hazard models
         df["gene_expression"] = df[gene]
         df["high_expression_group"] = high_expr_mask.astype(int)
-        df["sex_male"] = (df["sex"] == "male").astype(int)
+        covariate_cols = ["hardy_numeric"]
+        if len(df["sex"].unique()) > 1:
+            df["sex_male"] = (df["sex"] == "male").astype(int)
+            covariate_cols.append("sex_male")
         self.cph.fit(
-            df[["time", "event", "gene_expression", "sex_male", "hardy_numeric"]],
+            df[["time", "event", "gene_expression", *covariate_cols]],
             duration_col="time",
             event_col="event",
         )
         continuous_cox_summary = self.cph.summary
         cph_binary = CoxPHFitter()
         cph_binary.fit(
-            df[["time", "event", "high_expression_group", "sex_male", "hardy_numeric"]],
+            df[["time", "event", "high_expression_group", *covariate_cols]],
             duration_col="time",
             event_col="event",
         )
@@ -239,13 +242,21 @@ class SurvivalAnalysisService:
                 )
                 < 0.05,
                 "covariates": {
-                    "sex_male": {
-                        "coef": float(continuous_cox_summary.loc["sex_male", "coef"]),
-                        "p_value": float(continuous_cox_summary.loc["sex_male", "p"]),
-                        "hazard_ratio": float(
-                            np.exp(continuous_cox_summary.loc["sex_male", "coef"])
-                        ),
-                    },
+                    "sex_male": (
+                        {
+                            "coef": float(
+                                continuous_cox_summary.loc["sex_male", "coef"]
+                            ),
+                            "p_value": float(
+                                continuous_cox_summary.loc["sex_male", "p"]
+                            ),
+                            "hazard_ratio": float(
+                                np.exp(continuous_cox_summary.loc["sex_male", "coef"])
+                            ),
+                        }
+                        if "sex_male" in covariate_cols
+                        else {}
+                    ),
                     "hardy_numeric": {
                         "coef": float(
                             continuous_cox_summary.loc["hardy_numeric", "coef"]
@@ -261,7 +272,7 @@ class SurvivalAnalysisService:
                 "model_quality": {
                     "concordance": float(self.cph.concordance_index_),
                     "log_likelihood": float(self.cph.log_likelihood_),
-                    "aic": float(self.cph.AIC_),
+                    "aic": float(self.cph.AIC_partial_),
                 },
             },
             "binary_expression_group": {
@@ -279,13 +290,17 @@ class SurvivalAnalysisService:
                 )
                 < 0.05,
                 "covariates": {
-                    "sex_male": {
-                        "coef": float(binary_cox_summary.loc["sex_male", "coef"]),
-                        "p_value": float(binary_cox_summary.loc["sex_male", "p"]),
-                        "hazard_ratio": float(
-                            np.exp(binary_cox_summary.loc["sex_male", "coef"])
-                        ),
-                    },
+                    "sex_male": (
+                        {
+                            "coef": float(binary_cox_summary.loc["sex_male", "coef"]),
+                            "p_value": float(binary_cox_summary.loc["sex_male", "p"]),
+                            "hazard_ratio": float(
+                                np.exp(binary_cox_summary.loc["sex_male", "coef"])
+                            ),
+                        }
+                        if "sex_male" in covariate_cols
+                        else {}
+                    ),
                     "hardy_numeric": {
                         "coef": float(binary_cox_summary.loc["hardy_numeric", "coef"]),
                         "p_value": float(binary_cox_summary.loc["hardy_numeric", "p"]),
@@ -297,7 +312,7 @@ class SurvivalAnalysisService:
                 "model_quality": {
                     "concordance": float(cph_binary.concordance_index_),
                     "log_likelihood": float(cph_binary.log_likelihood_),
-                    "aic": float(cph_binary.AIC_),
+                    "aic": float(cph_binary.AIC_partial_),
                 },
             },
         }

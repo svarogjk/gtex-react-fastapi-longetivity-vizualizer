@@ -659,11 +659,11 @@ class ExpressionEndpoints:
         return pd.DataFrame()
 
     def prepare_df_meta(self, df_meta: pd.DataFrame) -> pd.DataFrame:
-        df_meta["hardyNumeric"] = self.le_hardy.fit_transform(df_meta["hardyScale"])
-        df_meta[["ageLow", "ageHigh"]] = (
+        df_meta["hardy_numeric"] = self.le_hardy.fit_transform(df_meta["hardyScale"])
+        df_meta[["age_low", "age_high"]] = (
             df_meta["ageBracket"].str.split("-", expand=True).astype(int)
         )
-        df_meta["time"] = (df_meta["ageLow"] + df_meta["ageHigh"]) / 2
+        df_meta["time"] = (df_meta["age_low"] + df_meta["age_high"]) / 2
         return df_meta
 
 
