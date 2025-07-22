@@ -96,6 +96,93 @@ interface LongevityAnalysisResponse {
   };
 }
 
+interface GeneSurvivalDataResponse {
+  metadata: {
+    gene: string;
+    tissue: string;
+    sample_count: number;
+    high_expr_count: number;
+    low_expr_count: number;
+    median_expression: number;
+    cutpoint: {
+      value: number;
+      type: string;
+      high_expression_definition: string;
+      low_expression_definition: string;
+      percent_high: number;
+      percent_low: number;
+    };
+  };
+  high_expression: {
+    survival_curve: Array<{
+      time: number;
+      survival_probability: number;
+    }>;
+    median_survival: number;
+    min_time: number;
+    max_time: number;
+  };
+  low_expression: {
+    survival_curve: Array<{
+      time: number;
+      survival_probability: number;
+    }>;
+    median_survival: number;
+    min_time: number;
+    max_time: number;
+  };
+  statistical_analysis: {
+    logrank_test: {
+      p_value: number;
+      test_statistic: number;
+      is_significant: boolean;
+    };
+    cox_models: {
+      continuous_expression: {
+        gene_expression_coef: number;
+        gene_expression_p_value: number;
+        gene_expression_hazard_ratio: number;
+        gene_expression_is_significant: boolean;
+        covariates: {
+          sex_male: Record<string, never>; // empty object
+          hardy_numeric: {
+            coef: number;
+            p_value: number;
+            hazard_ratio: number;
+          };
+        };
+        model_quality: {
+          concordance: number;
+          log_likelihood: number;
+          aic: number;
+        };
+      };
+      binary_expression_group: {
+        high_expression_group_coef: number;
+        high_expression_group_p_value: number;
+        high_expression_group_hazard_ratio: number;
+        high_expression_group_is_significant: boolean;
+        covariates: {
+          sex_male: Record<string, never>; // empty object
+          hardy_numeric: {
+            coef: number;
+            p_value: number;
+            hazard_ratio: number;
+          };
+        };
+        model_quality: {
+          concordance: number;
+          log_likelihood: number;
+          aic: number;
+        };
+      };
+    };
+  };
+  interpretation: string;
+}
+
+
+
 // Define the API service
 export const api = createApi({
   reducerPath: 'api',
@@ -175,6 +262,16 @@ export const api = createApi({
         { type: 'Tissue' as const, id: arg.tissue }
       ]
     }),
+
+    // Gene Survival Analysis endpoint
+    getGeneSurvivalData: builder.query<GeneSurvivalDataResponse, { gene: string; tissue: string }>({
+      query: ({ gene, tissue }) => `survival/genes/${gene}/${tissue}`,
+      providesTags: (result, error, arg) => [
+        { type: 'Gene', id: arg.gene },
+        { type: 'Tissue', id: arg.tissue },
+        { type: 'Survival', id: `${arg.gene}-${arg.tissue}` }
+      ]
+    }),
     
     analyzeLongevity: builder.query<LongevityAnalysisResponse, { genes: string[]; tissue: string }>({
       query: ({ genes, tissue }) => ({
@@ -201,6 +298,7 @@ export const {
   useGetDatasetDetailsQuery,
   useGetDropdownOptionsQuery,
   useGetExpressionDataQuery,
+  useGetGeneSurvivalDataQuery,
   useAnalyzeLongevityQuery,
 } = api;
 
@@ -227,6 +325,12 @@ export default {
   getDatasetMetadata: async (datasetId: string): Promise<DatasetMetadataResponse> => {
     const response = await fetch(`/api/expression/datasets/${datasetId}/metadata`);
     if (!response.ok) throw new Error(`Failed to fetch metadata for dataset ${datasetId}`);
+    return response.json();
+  },
+
+  getGeneSurvivalData: async (gene: string): Promise<TissueExpressionResponse> => {
+    const response = await fetch(`/api/genes/${gene}/tissue-summary`);
+    if (!response.ok) throw new Error(`Failed to fetch tissue summary for ${gene}`);
     return response.json();
   },
   

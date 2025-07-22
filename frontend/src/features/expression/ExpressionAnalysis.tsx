@@ -2,7 +2,8 @@ import { GeneSelector } from './GeneSelector';
 import { TissueSelector } from './TissueSelector';
 import { DatasetSelector } from './DatasetSelector'; 
 import { TissueExpressionChart } from './TissueExpressionChart';
-import { DatasetMetadataTable } from './DatasetMetadataTable'; 
+import { DatasetMetadataTable } from './DatasetMetadataTable';
+import { GeneSurvivalAnalysisTable } from './GeneSurvivalResult'; 
 import { useAppSelector } from '../../app/hooks';
 
 export const ExpressionAnalysis = () => {
@@ -27,7 +28,10 @@ export const ExpressionAnalysis = () => {
               <>
                 <DatasetSelector />
                 {selectedDataset && (
-                  <DatasetMetadataTable />
+                  <>
+                    <DatasetMetadataTable />
+                    <GeneSurvivalAnalysisTable />
+                  </>
                 )}
               </>
             )}
