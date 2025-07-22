@@ -150,7 +150,7 @@ export const GeneSurvivalAnalysisTable = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="time" 
-                  label={{ value: 'Time (days)', position: 'insideBottom', offset: -5 }}
+                  label={{ value: 'Time (years)', position: 'insideBottom', offset: -5 }}
                 />
                 <YAxis 
                   label={{ value: 'Survival Probability', angle: -90, position: 'insideLeft' }}
@@ -161,7 +161,7 @@ export const GeneSurvivalAnalysisTable = () => {
                     value ? value.toFixed(3) : 'N/A',
                     name === 'high_expression' ? 'High Expression' : 'Low Expression'
                   ]}
-                  labelFormatter={(label) => `Time: ${label} days`}
+                  labelFormatter={(label) => `Time: ${label} years`}
                 />
                 <Legend />
                 <Line 
@@ -275,13 +275,13 @@ export const GeneSurvivalAnalysisTable = () => {
             <div>
               <span className="font-medium text-gray-700">High Expression Group:</span>
               <span className="ml-2 text-gray-900">
-                {data.high_expression.median_survival ? `${data.high_expression.median_survival} days` : 'Not reached'}
+                {data.high_expression.median_survival ? `${data.high_expression.median_survival} years` : 'Not reached'}
               </span>
             </div>
             <div>
               <span className="font-medium text-gray-700">Low Expression Group:</span>
               <span className="ml-2 text-gray-900">
-                {data.low_expression.median_survival ? `${data.low_expression.median_survival} days` : 'Not reached'}
+                {data.low_expression.median_survival ? `${data.low_expression.median_survival} years` : 'Not reached'}
               </span>
             </div>
           </div>
